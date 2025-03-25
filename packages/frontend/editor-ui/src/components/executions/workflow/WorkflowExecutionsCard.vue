@@ -2,7 +2,6 @@
 import { computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import type { IExecutionUIData } from '@/composables/useExecutionHelpers';
-import { EnterpriseEditionFeature, VIEWS } from '@/constants';
 import ExecutionsTime from '@/components/executions/ExecutionsTime.vue';
 import { useExecutionHelpers } from '@/composables/useExecutionHelpers';
 import type { ExecutionSummary } from 'n8n-workflow';
@@ -31,10 +30,8 @@ const executionHelpers = useExecutionHelpers();
 const workflowsStore = useWorkflowsStore();
 const settingsStore = useSettingsStore();
 
-const isAdvancedExecutionFilterEnabled = computed(
-	() => settingsStore.isEnterpriseFeatureEnabled[EnterpriseEditionFeature.AdvancedExecutionFilters],
-);
-const isAnnotationEnabled = computed(() => isAdvancedExecutionFilterEnabled.value);
+const isAdvancedExecutionFilterEnabled = computed(() => false);
+const isAnnotationEnabled = computed(() => false);
 
 const currentWorkflow = computed(() => (route.params.name as string) || workflowsStore.workflowId);
 const retryExecutionActions = computed(() => [

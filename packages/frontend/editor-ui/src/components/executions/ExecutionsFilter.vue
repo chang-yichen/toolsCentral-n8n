@@ -8,7 +8,6 @@ import type {
 } from '@/Interface';
 import { i18n as locale } from '@/plugins/i18n';
 import { getObjectKeys, isEmpty } from '@/utils/typesUtils';
-import { EnterpriseEditionFeature } from '@/constants';
 import { useSettingsStore } from '@/stores/settings.store';
 import { useTelemetry } from '@/composables/useTelemetry';
 import type { Placement } from '@floating-ui/core';
@@ -43,10 +42,8 @@ const debouncedEmit = debounce(emit, {
 });
 
 const isCustomDataFilterTracked = ref(false);
-const isAdvancedExecutionFilterEnabled = computed(
-	() => settingsStore.isEnterpriseFeatureEnabled[EnterpriseEditionFeature.AdvancedExecutionFilters],
-);
-const isAnnotationFiltersEnabled = computed(() => isAdvancedExecutionFilterEnabled.value);
+const isAdvancedExecutionFilterEnabled = computed(() => false);
+const isAnnotationFiltersEnabled = computed(() => false);
 const showTags = computed(() => false);
 
 const getDefaultFilter = (): ExecutionFilterType => ({

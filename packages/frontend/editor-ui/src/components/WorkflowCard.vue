@@ -5,7 +5,6 @@ import {
 	MODAL_CONFIRM,
 	PROJECT_MOVE_RESOURCE_MODAL,
 	VIEWS,
-	WORKFLOW_SHARE_MODAL_KEY,
 } from '@/constants';
 import { useMessage } from '@/composables/useMessage';
 import { useToast } from '@/composables/useToast';
@@ -32,7 +31,6 @@ import { useFoldersStore } from '@/stores/folders.store';
 
 const WORKFLOW_LIST_ITEM_ACTIONS = {
 	OPEN: 'open',
-	SHARE: 'share',
 	DUPLICATE: 'duplicate',
 	DELETE: 'delete',
 	MOVE: 'move',
@@ -127,10 +125,6 @@ const actions = computed(() => {
 			label: locale.baseText('workflows.item.open'),
 			value: WORKFLOW_LIST_ITEM_ACTIONS.OPEN,
 		},
-		{
-			label: locale.baseText('workflows.item.share'),
-			value: WORKFLOW_LIST_ITEM_ACTIONS.SHARE,
-		},
 	];
 
 	if (workflowPermissions.value.create && !props.readOnly) {
@@ -221,18 +215,6 @@ async function onAction(action: string) {
 					),
 					externalEventBus: props.workflowListEventBus,
 				},
-			});
-			break;
-		case WORKFLOW_LIST_ITEM_ACTIONS.SHARE:
-			uiStore.openModalWithData({
-				name: WORKFLOW_SHARE_MODAL_KEY,
-				data: { id: props.data.id },
-			});
-
-			telemetry.track('User opened sharing modal', {
-				workflow_id: props.data.id,
-				user_id_sharer: currentUser.value.id,
-				sub_view: 'Workflows listing',
 			});
 			break;
 		case WORKFLOW_LIST_ITEM_ACTIONS.DELETE:

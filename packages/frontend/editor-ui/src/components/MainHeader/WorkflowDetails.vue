@@ -10,7 +10,6 @@ import {
 	VIEWS,
 	WORKFLOW_MENU_ACTIONS,
 	WORKFLOW_SETTINGS_MODAL_KEY,
-	WORKFLOW_SHARE_MODAL_KEY,
 } from '@/constants';
 import ShortenName from '@/components/ShortenName.vue';
 import WorkflowTagsContainer from '@/components/WorkflowTagsContainer.vue';
@@ -20,8 +19,6 @@ import SaveButton from '@/components/SaveButton.vue';
 import WorkflowTagsDropdown from '@/components/WorkflowTagsDropdown.vue';
 import InlineTextEdit from '@/components/InlineTextEdit.vue';
 import BreakpointsObserver from '@/components/BreakpointsObserver.vue';
-import WorkflowHistoryButton from '@/components/MainHeader/WorkflowHistoryButton.vue';
-import CollaborationPane from '@/components/MainHeader/CollaborationPane.vue';
 import PublishToMarketplaceButton from '@/components/PublishToMarketplaceButton.vue';
 
 import { useRootStore } from '@/stores/root.store';
@@ -270,19 +267,6 @@ async function onSaveButtonClick() {
 			});
 		}
 	}
-}
-
-function onShareButtonClick() {
-	uiStore.openModalWithData({
-		name: WORKFLOW_SHARE_MODAL_KEY,
-		data: { id: props.id },
-	});
-
-	telemetry.track('User opened sharing modal', {
-		workflow_id: props.id,
-		user_id_sharer: usersStore.currentUser?.id,
-		sub_view: route.name === VIEWS.WORKFLOWS ? 'Workflows listing' : 'Workflow editor',
-	});
 }
 
 function onTagsEditEnable() {
@@ -648,45 +632,6 @@ const canPublishWorkflow = computed(() => workflowPermissions.value.update);
 					:workflow-permissions="workflowPermissions"
 				/>
 			</span>
-			<EnterpriseEdition :features="[EnterpriseEditionFeature.Sharing]">
-				<div :class="$style.group">
-					<CollaborationPane v-if="!isNewWorkflow" />
-					<N8nButton
-						type="secondary"
-						data-test-id="workflow-share-button"
-						@click="onShareButtonClick"
-					>
-						{{ i18n.baseText('workflowDetails.share') }}
-					</N8nButton>
-				</div>
-				<template #fallback>
-					<N8nTooltip>
-						<N8nButton type="secondary" :class="['mr-2xs', $style.disabledShareButton]">
-							{{ i18n.baseText('workflowDetails.share') }}
-						</N8nButton>
-						<template #content>
-							<i18n-t
-								:keypath="
-									uiStore.contextBasedTranslationKeys.workflows.sharing.unavailable.description
-										.tooltip
-								"
-								tag="span"
-							>
-								<template #action>
-									<a @click="goToUpgrade">
-										{{
-											i18n.baseText(
-												uiStore.contextBasedTranslationKeys.workflows.sharing.unavailable
-													.button as BaseTextKey,
-											)
-										}}
-									</a>
-								</template>
-							</i18n-t>
-						</template>
-					</N8nTooltip>
-				</template>
-			</EnterpriseEdition>
 			<div :class="$style.group" v-if="!isNewWorkflow">
 				<PublishToMarketplaceButton
 					:workflow-id="id"
@@ -709,12 +654,6 @@ const canPublishWorkflow = computed(() => workflowPermissions.value.update);
 					:shortcut-tooltip="i18n.baseText('saveWorkflowButton.hint')"
 					data-test-id="workflow-save-button"
 					@click="onSaveButtonClick"
-				/>
-				<WorkflowHistoryButton
-					:workflow-id="props.id"
-					:is-feature-enabled="isWorkflowHistoryFeatureEnabled"
-					:is-new-workflow="isNewWorkflow"
-					@upgrade="goToWorkflowHistoryUpgrade"
 				/>
 			</div>
 			<div :class="[$style.workflowMenuContainer, $style.group]">

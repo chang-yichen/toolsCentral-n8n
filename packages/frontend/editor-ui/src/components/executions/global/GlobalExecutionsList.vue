@@ -7,7 +7,7 @@ import { useMessage } from '@/composables/useMessage';
 import { usePageRedirectionHelper } from '@/composables/usePageRedirectionHelper';
 import { useTelemetry } from '@/composables/useTelemetry';
 import { useToast } from '@/composables/useToast';
-import { EnterpriseEditionFeature, MODAL_CONFIRM } from '@/constants';
+import { MODAL_CONFIRM } from '@/constants';
 import type { ExecutionFilterType, ExecutionSummaryWithScopes, IWorkflowDb } from '@/Interface';
 import type { PermissionsRecord } from '@/permissions';
 import { getResourcePermissions } from '@/permissions';
@@ -70,9 +70,7 @@ const workflows = computed<IWorkflowDb[]>(() => {
 	];
 });
 
-const isAnnotationEnabled = computed(
-	() => settingsStore.isEnterpriseFeatureEnabled[EnterpriseEditionFeature.AdvancedExecutionFilters],
-);
+const isAnnotationEnabled = computed(() => false);
 
 /**
  * Calculate the number of executions counted towards the production executions concurrency limit.
