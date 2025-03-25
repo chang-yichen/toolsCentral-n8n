@@ -22,6 +22,7 @@ import InlineTextEdit from '@/components/InlineTextEdit.vue';
 import BreakpointsObserver from '@/components/BreakpointsObserver.vue';
 import WorkflowHistoryButton from '@/components/MainHeader/WorkflowHistoryButton.vue';
 import CollaborationPane from '@/components/MainHeader/CollaborationPane.vue';
+import PublishToMarketplaceButton from '@/components/PublishToMarketplaceButton.vue';
 
 import { useRootStore } from '@/stores/root.store';
 import { useSettingsStore } from '@/stores/settings.store';
@@ -580,6 +581,8 @@ function showCreateWorkflowSuccessToast(id?: string) {
 		});
 	}
 }
+
+const canPublishWorkflow = computed(() => workflowPermissions.value.update);
 </script>
 
 <template>
@@ -684,6 +687,16 @@ function showCreateWorkflowSuccessToast(id?: string) {
 					</N8nTooltip>
 				</template>
 			</EnterpriseEdition>
+			<div :class="$style.group" v-if="!isNewWorkflow">
+				<PublishToMarketplaceButton
+					:workflow-id="id"
+					:workflow-name="name"
+					:disabled="!canPublishWorkflow"
+					type="secondary"
+					size="medium"
+					tooltip-content="Publish this workflow to the Marketplace"
+				/>
+			</div>
 			<div :class="$style.group">
 				<SaveButton
 					type="primary"

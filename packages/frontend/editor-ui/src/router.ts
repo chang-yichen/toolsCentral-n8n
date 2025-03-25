@@ -20,7 +20,7 @@ import { initializeAuthenticatedFeatures, initializeCore } from '@/init';
 import { tryToParseNumber } from '@/utils/typesUtils';
 import { projectsRoutes } from '@/routes/projects.routes';
 import TestDefinitionRunDetailView from './views/TestDefinition/TestDefinitionRunDetailView.vue';
-import PlaceholderPage from './components/PlaceholderPage.vue';
+import MarketplacePage from './components/MarketplacePage.vue';
 
 const ChangePasswordView = async () => await import('./views/ChangePasswordView.vue');
 const ErrorView = async () => await import('./views/ErrorView.vue');
@@ -88,9 +88,9 @@ export const routes: RouteRecordRaw[] = [
 		},
 	},
 	{
-		path: '/placeholder',
-		name: 'placeholder',
-		component: PlaceholderPage,
+		path: '/marketplace',
+		name: 'marketplace',
+		component: MarketplacePage,
 	},
 	{
 		path: '/collections/:id',

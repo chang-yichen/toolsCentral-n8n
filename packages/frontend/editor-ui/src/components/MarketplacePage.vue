@@ -10,7 +10,7 @@
 					label="Publish Workflow"
 					type="secondary"
 					size="large"
-					@click="showPublishForm = !showPublishForm"
+					@click="openPublishForm"
 				/>
 			</div>
 
@@ -18,6 +18,21 @@
 			<div v-if="showPublishForm" class="publish-form">
 				<h2>Publish a Workflow</h2>
 				<form @submit.prevent="publishWorkflow">
+					<!-- Workflow Selection -->
+					<div class="form-group">
+						<label for="workflowSelect">Select a Workflow</label>
+						<n8n-select
+							id="workflowSelect"
+							v-model="selectedWorkflowId"
+							placeholder="Select workflow to publish"
+							@change="onWorkflowSelected"
+						>
+							<n8n-option v-for="workflow in userWorkflows" :key="workflow.id" :value="workflow.id">
+								{{ workflow.name }}
+							</n8n-option>
+						</n8n-select>
+					</div>
+
 					<div class="form-group">
 						<label for="name">Workflow Name</label>
 						<n8n-input
@@ -34,15 +49,6 @@
 							v-model="publishForm.description"
 							type="textarea"
 							placeholder="Enter description"
-							required
-						/>
-					</div>
-					<div class="form-group">
-						<label for="workflowId">Workflow ID</label>
-						<n8n-input
-							id="workflowId"
-							v-model="publishForm.workflowId"
-							placeholder="Enter ID of workflow to publish"
 							required
 						/>
 					</div>
@@ -82,13 +88,44 @@
 			</div>
 			<div v-else-if="workflowsLoaded" class="marketplace-workflows">
 				<div class="workflow-cards">
-					<div v-for="workflow in marketplaceWorkflows" :key="workflow.id" class="workflow-card">
+					<div
+						v-for="workflow in marketplaceWorkflows"
+						:key="workflow.id"
+						class="workflow-card"
+						@click="viewWorkflowDetails(workflow)"
+					>
 						<h3>{{ workflow.name }}</h3>
 						<p>{{ workflow.description }}</p>
 						<div class="workflow-meta">
 							<span>By: {{ workflow.author }}</span>
 							<span>Downloads: {{ workflow.downloads }}</span>
 						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Workflow Details Modal -->
+			<div v-if="selectedWorkflow" class="workflow-modal-overlay" @click="selectedWorkflow = null">
+				<div class="workflow-modal" @click.stop>
+					<h2>{{ selectedWorkflow.name }}</h2>
+					<p class="description">{{ selectedWorkflow.description }}</p>
+
+					<div class="details-meta">
+						<div class="meta-item"><strong>Author:</strong> {{ selectedWorkflow.author }}</div>
+						<div class="meta-item">
+							<strong>Downloads:</strong> {{ selectedWorkflow.downloads }}
+						</div>
+						<div class="meta-item">
+							<strong>Published:</strong> {{ formatDate(selectedWorkflow.createdAt) }}
+						</div>
+					</div>
+
+					<div class="action-buttons">
+						<n8n-button
+							label="Copy to My Workflows"
+							type="primary"
+							@click="importWorkflow(selectedWorkflow)"
+						/>
 					</div>
 				</div>
 			</div>
@@ -100,21 +137,25 @@
 
 <script>
 import { PageViewLayout } from '@/components/layouts';
-import { getMarketplaceWorkflows, publishToMarketplace } from '@/api/marketplace';
+import { getMarketplaceWorkflows, publishToMarketplace, getUserWorkflows } from '@/api/marketplace';
 
 export default {
-	name: 'PlaceholderPage',
+	name: 'MarketplacePage',
 	components: {
 		PageViewLayout,
 	},
 	data() {
 		return {
 			marketplaceWorkflows: [],
+			userWorkflows: [],
 			loading: false,
 			error: null,
 			workflowsLoaded: false,
 			showPublishForm: false,
 			publishing: false,
+			loadingUserWorkflows: false,
+			selectedWorkflowId: null,
+			selectedWorkflow: null,
 			publishForm: {
 				name: '',
 				description: '',
@@ -143,13 +184,41 @@ export default {
 			}
 		},
 
+		async openPublishForm() {
+			this.showPublishForm = true;
+			this.loadingUserWorkflows = true;
+
+			try {
+				// Fetch user's workflows when opening the publish form
+				this.userWorkflows = await getUserWorkflows();
+			} catch (err) {
+				console.error('Error fetching user workflows:', err);
+				alert('Failed to load your workflows. Please try again.');
+			} finally {
+				this.loadingUserWorkflows = false;
+			}
+		},
+
+		onWorkflowSelected() {
+			if (this.selectedWorkflowId) {
+				// Find the selected workflow
+				const workflow = this.userWorkflows.find((w) => w.id === this.selectedWorkflowId);
+				if (workflow) {
+					// Prefill the form with the workflow name
+					this.publishForm.name = workflow.name;
+					this.publishForm.workflowId = workflow.id;
+				}
+			}
+		},
+
 		async publishWorkflow() {
-			if (!this.publishForm.name || !this.publishForm.description || !this.publishForm.workflowId) {
+			if (!this.publishForm.name || !this.publishForm.description || !this.selectedWorkflowId) {
 				// Simple validation - in real app you'd use proper form validation
-				alert('Please fill in all required fields');
+				alert('Please fill in all required fields and select a workflow');
 				return;
 			}
 
+			this.publishForm.workflowId = this.selectedWorkflowId;
 			this.publishing = true;
 
 			try {
@@ -168,6 +237,7 @@ export default {
 					category: 'automation',
 					isPublic: true,
 				};
+				this.selectedWorkflowId = null;
 
 				// Add the new workflow to the list
 				this.marketplaceWorkflows = [result, ...this.marketplaceWorkflows];
@@ -178,9 +248,42 @@ export default {
 				this.publishing = false;
 			}
 		},
+
+		viewWorkflowDetails(workflow) {
+			this.selectedWorkflow = workflow;
+		},
+
+		importWorkflow(workflow) {
+			// Simulate importing a workflow
+			alert(`Workflow "${workflow.name}" has been copied to your workflows.`);
+			this.selectedWorkflow = null;
+		},
+
+		formatDate(dateString) {
+			if (!dateString) return '';
+			const date = new Date(dateString);
+			return date.toLocaleDateString('en-US', {
+				year: 'numeric',
+				month: 'short',
+				day: 'numeric',
+			});
+		},
 	},
 	mounted() {
 		this.fetchWorkflows();
+
+		// Check if we're coming from the workflows page to publish a workflow
+		const { publish, workflowId, workflowName } = this.$route.query;
+
+		if (publish === 'true' && workflowId) {
+			this.showPublishForm = true;
+			this.selectedWorkflowId = workflowId;
+			this.publishForm.name = workflowName || '';
+			this.publishForm.workflowId = workflowId;
+
+			// Fetch user workflows to populate the dropdown
+			this.openPublishForm();
+		}
 	},
 };
 </script>
@@ -273,6 +376,7 @@ export default {
 		border-radius: 8px;
 		padding: 1.5em;
 		transition: box-shadow 0.3s ease;
+		cursor: pointer;
 
 		&:hover {
 			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -294,6 +398,62 @@ export default {
 			font-size: 0.9em;
 			color: #999;
 		}
+	}
+
+	// Modal styles
+	.workflow-modal-overlay {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background-color: rgba(0, 0, 0, 0.5);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 1000;
+	}
+
+	.workflow-modal {
+		background-color: white;
+		border-radius: 8px;
+		padding: 2em;
+		max-width: 600px;
+		width: 90%;
+		text-align: left;
+		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+
+		h2 {
+			margin-top: 0;
+			margin-bottom: 1em;
+		}
+
+		.description {
+			margin-bottom: 2em;
+			line-height: 1.6;
+		}
+
+		.details-meta {
+			margin-bottom: 2em;
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 1em;
+
+			.meta-item {
+				margin-bottom: 0.5em;
+			}
+		}
+
+		.action-buttons {
+			display: flex;
+			justify-content: center;
+			margin-top: 1em;
+		}
+	}
+
+	.back-link {
+		display: block;
+		margin-top: 2em;
 	}
 }
 </style>

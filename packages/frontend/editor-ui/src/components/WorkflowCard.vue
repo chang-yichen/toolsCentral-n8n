@@ -161,6 +161,13 @@ const actions = computed(() => {
 		});
 	}
 
+	if (workflowPermissions.value.update) {
+		items.push({
+			label: 'Publish to Marketplace',
+			value: 'publishToMarketplace',
+		});
+	}
+
 	return items;
 });
 const formattedCreatedAtDate = computed(() => {
@@ -241,6 +248,9 @@ async function onAction(action: string) {
 				parentFolderId: props.data.parentFolder?.id,
 			});
 			break;
+		case 'publishToMarketplace':
+			onPublishToMarketplace();
+			break;
 	}
 }
 
@@ -312,6 +322,17 @@ const onBreadcrumbItemClick = async (item: PathItem) => {
 		await router.push(item.href);
 	}
 };
+
+function onPublishToMarketplace() {
+	router.push({
+		path: '/marketplace',
+		query: {
+			publish: 'true',
+			workflowId: props.data.id,
+			workflowName: props.data.name,
+		},
+	});
+}
 </script>
 
 <template>

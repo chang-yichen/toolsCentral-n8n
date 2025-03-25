@@ -1192,6 +1192,14 @@ const onCreateWorkflowClick = () => {
 		},
 	});
 };
+
+const onPublishToMarketplace = () => {
+	// Navigate to the marketplace with a flag to open the publish dialog
+	router.push({
+		path: '/marketplace',
+		query: { publish: 'true' },
+	});
+};
 </script>
 
 <template>
