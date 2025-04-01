@@ -155,6 +155,12 @@ const mainMenuItems = computed(() => [
 			},
 		],
 	},
+	{
+		name: 'marketplace',
+		label: 'Marketplace',
+		icon: 'n8n-icon-store',
+		exact: true,
+	},
 ]);
 const createBtn = ref<InstanceType<typeof N8nNavigationDropdown>>();
 

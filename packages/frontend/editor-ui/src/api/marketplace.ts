@@ -1,87 +1,79 @@
-// Define our mock data
-const MOCK_WORKFLOWS = [
-	{
-		id: '1',
-		name: 'Email Automation',
-		description: 'Automatically send emails based on triggers',
-		author: 'Demo User',
-		downloads: 120,
-		createdAt: new Date().toISOString(),
-	},
-	{
-		id: '2',
-		name: 'Data Backup Workflow',
-		description: 'Regularly backup your data to cloud storage',
-		author: 'Test User',
-		downloads: 85,
-		createdAt: new Date().toISOString(),
-	},
-	{
-		id: '3',
-		name: 'Social Media Posting',
-		description: 'Schedule and post to multiple social platforms',
-		author: 'Admin',
-		downloads: 230,
-		createdAt: new Date().toISOString(),
-	},
-];
+import type { IRestApiContext } from '@/Interface'; // Assuming context type path
+import { makeRestApiRequest } from '@/utils/apiUtils';
 
-// Mock user workflows
-const USER_WORKFLOWS = [
-	{
-		id: 'user-wf-1',
-		name: 'My Email Workflow',
-		active: false,
-		createdAt: Date.now() - 1000000,
-		updatedAt: Date.now() - 500000,
-	},
-	{
-		id: 'user-wf-2',
-		name: 'Data Processing Workflow',
-		active: true,
-		createdAt: Date.now() - 2000000,
-		updatedAt: Date.now() - 100000,
-	},
-	{
-		id: 'user-wf-3',
-		name: 'Social Media Integration',
-		active: false,
-		createdAt: Date.now() - 3000000,
-		updatedAt: Date.now() - 300000,
-	},
-];
-
-// Simple function to simulate API calls
-export async function getMarketplaceWorkflows() {
-	// Simulate network delay
-	await new Promise((resolve) => setTimeout(resolve, 500));
-	return MOCK_WORKFLOWS;
-}
-
-// Function to get user's workflows
-export async function getUserWorkflows() {
-	// Simulate network delay
-	await new Promise((resolve) => setTimeout(resolve, 300));
-	return USER_WORKFLOWS;
-}
-
-// Function to simulate publishing
-export async function publishToMarketplace(data: {
+// Define interfaces for expected data structures (align with backend)
+interface MarketplaceWorkflow {
+	id: string;
 	name: string;
 	description: string;
 	category: string;
+	authorId: string;
+	authorName: string;
+	downloads: number;
 	isPublic: boolean;
-	workflowId: string;
-}) {
-	// Simulate network delay
-	await new Promise((resolve) => setTimeout(resolve, 800));
+	createdAt: string; // Assuming ISO string date
+	updatedAt: string;
+	// workflowJson might not be needed on the frontend list view
+}
 
-	// Return a mock response with the data
-	return {
-		id: Math.random().toString(36).substring(2, 10),
-		...data,
-		author: 'Current User',
-		downloads: 0,
-		createdAt: new Date().toISOString(),
-	};
+interface UserWorkflow {
+	id: string;
+	name: string;
+	// Add other relevant fields if needed (active, createdAt, etc.)
+}
+
+interface PublishData {
+	name: string;
+	description: string;
+	category: string;
+	workflowId: string;
+	isPublic?: boolean;
+}
+
+const BASE_ENDPOINT = '/marketplace';
+
+// Function to get marketplace workflows
+export async function getMarketplaceWorkflows(
+	context: IRestApiContext,
+): Promise<MarketplaceWorkflow[]> {
+	// GET /marketplace
+	return await makeRestApiRequest<MarketplaceWorkflow[]>(context, 'GET', BASE_ENDPOINT);
+}
+
+// Function to get user's workflows for publishing dropdown
+export async function getUserWorkflows(context: IRestApiContext): Promise<UserWorkflow[]> {
+	// GET /marketplace/user-workflows
+	return await makeRestApiRequest<UserWorkflow[]>(
+		context,
+		'GET',
+		`${BASE_ENDPOINT}/user-workflows`,
+	);
+}
+
+// Function to publish a workflow
+export async function publishToMarketplace(
+	context: IRestApiContext,
+	data: PublishData,
+): Promise<MarketplaceWorkflow> {
+	// POST /marketplace/publish
+	return await makeRestApiRequest<MarketplaceWorkflow>(
+		context,
+		'POST',
+		`${BASE_ENDPOINT}/publish`,
+		data,
+	);
+}
+
+// Function to import a workflow (copy to user's workflows)
+export async function importMarketplaceWorkflow(
+	context: IRestApiContext,
+	marketplaceWorkflowId: string,
+): Promise<UserWorkflow> {
+	// Returns the newly created user workflow
+	// POST /marketplace/import/:id
+	return await makeRestApiRequest<UserWorkflow>(
+		context,
+		'POST',
+		`${BASE_ENDPOINT}/import/${marketplaceWorkflowId}`,
+	);
 }

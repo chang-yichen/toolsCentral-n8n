@@ -136,154 +136,168 @@
 </template>
 
 <script>
+import { ref, onMounted, computed } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { PageViewLayout } from '@/components/layouts';
-import { getMarketplaceWorkflows, publishToMarketplace, getUserWorkflows } from '@/api/marketplace';
+import { useRootStore } from '@/stores/root.store';
+import {
+	getMarketplaceWorkflows,
+	publishToMarketplace,
+	getUserWorkflows,
+	importMarketplaceWorkflow,
+} from '@/api/marketplace';
 
 export default {
 	name: 'MarketplacePage',
 	components: {
 		PageViewLayout,
 	},
-	data() {
-		return {
-			marketplaceWorkflows: [],
-			userWorkflows: [],
-			loading: false,
-			error: null,
-			workflowsLoaded: false,
-			showPublishForm: false,
-			publishing: false,
-			loadingUserWorkflows: false,
-			selectedWorkflowId: null,
-			selectedWorkflow: null,
-			publishForm: {
-				name: '',
-				description: '',
-				workflowId: '',
-				category: 'automation',
-				isPublic: true,
-			},
-		};
-	},
-	methods: {
-		async fetchWorkflows() {
-			this.loading = true;
-			this.error = null;
+	setup() {
+		const route = useRoute();
+		const router = useRouter();
+		const rootStore = useRootStore();
+		const restApiContext = computed(() => rootStore.restApiContext);
 
+		const marketplaceWorkflows = ref([]);
+		const userWorkflows = ref([]);
+		const loading = ref(false);
+		const error = ref(null);
+		const workflowsLoaded = ref(false);
+		const showPublishForm = ref(false);
+		const publishing = ref(false);
+		const loadingUserWorkflows = ref(false);
+		const selectedWorkflowId = ref(null);
+		const selectedWorkflow = ref(null);
+		const publishForm = ref({
+			name: '',
+			description: '',
+			workflowId: '',
+			category: 'automation',
+			isPublic: true,
+		});
+
+		const fetchWorkflows = async () => {
+			loading.value = true;
+			error.value = null;
 			try {
-				// Call our API function
-				const workflows = await getMarketplaceWorkflows();
-
-				this.marketplaceWorkflows = workflows;
-				this.workflowsLoaded = true;
+				marketplaceWorkflows.value = await getMarketplaceWorkflows(restApiContext.value);
+				workflowsLoaded.value = true;
 			} catch (err) {
 				console.error('Error in fetchWorkflows:', err);
-				this.error = 'Failed to load marketplace workflows. Please try again.';
+				error.value = err.message || 'Failed to load marketplace workflows. Please try again.';
 			} finally {
-				this.loading = false;
+				loading.value = false;
 			}
-		},
+		};
 
-		async openPublishForm() {
-			this.showPublishForm = true;
-			this.loadingUserWorkflows = true;
-
+		const openPublishForm = async () => {
+			showPublishForm.value = true;
+			loadingUserWorkflows.value = true;
 			try {
-				// Fetch user's workflows when opening the publish form
-				this.userWorkflows = await getUserWorkflows();
+				userWorkflows.value = await getUserWorkflows(restApiContext.value);
 			} catch (err) {
 				console.error('Error fetching user workflows:', err);
 				alert('Failed to load your workflows. Please try again.');
 			} finally {
-				this.loadingUserWorkflows = false;
+				loadingUserWorkflows.value = false;
 			}
-		},
+		};
 
-		onWorkflowSelected() {
-			if (this.selectedWorkflowId) {
-				// Find the selected workflow
-				const workflow = this.userWorkflows.find((w) => w.id === this.selectedWorkflowId);
+		const onWorkflowSelected = () => {
+			if (selectedWorkflowId.value) {
+				const workflow = userWorkflows.value.find((w) => w.id === selectedWorkflowId.value);
 				if (workflow) {
-					// Prefill the form with the workflow name
-					this.publishForm.name = workflow.name;
-					this.publishForm.workflowId = workflow.id;
+					publishForm.value.name = workflow.name;
+					publishForm.value.workflowId = workflow.id;
 				}
 			}
-		},
+		};
 
-		async publishWorkflow() {
-			if (!this.publishForm.name || !this.publishForm.description || !this.selectedWorkflowId) {
-				// Simple validation - in real app you'd use proper form validation
+		const publishWorkflow = async () => {
+			if (!publishForm.value.name || !publishForm.value.description || !selectedWorkflowId.value) {
 				alert('Please fill in all required fields and select a workflow');
 				return;
 			}
 
-			this.publishForm.workflowId = this.selectedWorkflowId;
-			this.publishing = true;
-
+			publishForm.value.workflowId = selectedWorkflowId.value;
+			publishing.value = true;
 			try {
-				// Call the publish API
-				const result = await publishToMarketplace(this.publishForm);
-
-				// Show success message
+				const result = await publishToMarketplace(restApiContext.value, publishForm.value);
 				alert(`Successfully published "${result.name}" to the marketplace.`);
-
-				// Reset form and close it
-				this.showPublishForm = false;
-				this.publishForm = {
+				showPublishForm.value = false;
+				publishForm.value = {
 					name: '',
 					description: '',
 					workflowId: '',
 					category: 'automation',
 					isPublic: true,
 				};
-				this.selectedWorkflowId = null;
-
-				// Add the new workflow to the list
-				this.marketplaceWorkflows = [result, ...this.marketplaceWorkflows];
+				selectedWorkflowId.value = null;
+				marketplaceWorkflows.value = [result, ...marketplaceWorkflows.value];
 			} catch (err) {
 				console.error('Error publishing workflow:', err);
 				alert('Failed to publish workflow: ' + (err.message || 'Unknown error'));
 			} finally {
-				this.publishing = false;
+				publishing.value = false;
 			}
-		},
+		};
 
-		viewWorkflowDetails(workflow) {
-			this.selectedWorkflow = workflow;
-		},
+		const viewWorkflowDetails = (workflow) => {
+			selectedWorkflow.value = workflow;
+		};
 
-		importWorkflow(workflow) {
-			// Simulate importing a workflow
-			alert(`Workflow "${workflow.name}" has been copied to your workflows.`);
-			this.selectedWorkflow = null;
-		},
+		const importWorkflow = async (workflowToImport) => {
+			try {
+				const importedWf = await importMarketplaceWorkflow(
+					restApiContext.value,
+					workflowToImport.id,
+				);
+				alert(`Workflow "${importedWf.name}" has been copied to your workflows.`);
+				selectedWorkflow.value = null;
+			} catch (err) {
+				console.error('Error importing workflow:', err);
+				alert('Failed to import workflow: ' + (err.message || 'Unknown error'));
+			}
+		};
 
-		formatDate(dateString) {
+		const formatDate = (dateString) => {
 			if (!dateString) return '';
 			const date = new Date(dateString);
-			return date.toLocaleDateString('en-US', {
-				year: 'numeric',
-				month: 'short',
-				day: 'numeric',
-			});
-		},
-	},
-	mounted() {
-		this.fetchWorkflows();
+			return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+		};
 
-		// Check if we're coming from the workflows page to publish a workflow
-		const { publish, workflowId, workflowName } = this.$route.query;
+		onMounted(() => {
+			fetchWorkflows();
 
-		if (publish === 'true' && workflowId) {
-			this.showPublishForm = true;
-			this.selectedWorkflowId = workflowId;
-			this.publishForm.name = workflowName || '';
-			this.publishForm.workflowId = workflowId;
+			const { publish, workflowId, workflowName } = route.query;
+			if (publish === 'true' && workflowId) {
+				selectedWorkflowId.value = workflowId;
+				publishForm.value.name = workflowName || '';
+				publishForm.value.workflowId = workflowId;
+				openPublishForm();
+			}
+		});
 
-			// Fetch user workflows to populate the dropdown
-			this.openPublishForm();
-		}
+		return {
+			marketplaceWorkflows,
+			userWorkflows,
+			loading,
+			error,
+			workflowsLoaded,
+			showPublishForm,
+			publishing,
+			loadingUserWorkflows,
+			selectedWorkflowId,
+			selectedWorkflow,
+			publishForm,
+			fetchWorkflows,
+			openPublishForm,
+			onWorkflowSelected,
+			publishWorkflow,
+			viewWorkflowDetails,
+			importWorkflow,
+			formatDate,
+		};
 	},
 };
 </script>
