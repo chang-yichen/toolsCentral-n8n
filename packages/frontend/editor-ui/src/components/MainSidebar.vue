@@ -97,6 +97,14 @@ const mainMenuItems = computed(() => [
 		},
 	},
 	{
+		id: 'marketplace',
+		icon: 'store',
+		label: 'Marketplace',
+		position: 'bottom',
+		available: true,
+		route: { to: { name: 'marketplace' } },
+	},
+	{
 		id: 'help',
 		icon: 'question',
 		label: i18n.baseText('mainSidebar.help'),
@@ -154,12 +162,6 @@ const mainMenuItems = computed(() => [
 				position: 'bottom',
 			},
 		],
-	},
-	{
-		name: 'marketplace',
-		label: 'Marketplace',
-		icon: 'n8n-icon-store',
-		exact: true,
 	},
 ]);
 const createBtn = ref<InstanceType<typeof N8nNavigationDropdown>>();
@@ -246,6 +248,9 @@ const handleSelect = (key: string) => {
 			if (settingsStore.isTemplatesEnabled && !templatesStore.hasCustomTemplatesHost) {
 				trackTemplatesClick();
 			}
+			break;
+		case 'marketplace':
+			// Handle marketplace navigation if needed
 			break;
 		case 'about': {
 			trackHelpItemClick('about');
