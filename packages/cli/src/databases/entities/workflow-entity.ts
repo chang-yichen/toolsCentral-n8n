@@ -104,6 +104,22 @@ export class WorkflowEntity extends WithTimestampsAndStringId implements IWorkfl
 	})
 	@JoinColumn({ name: 'parentFolderId' })
 	parentFolder: Folder | null;
+
+	@Column({ default: false })
+	isPublished: boolean;
+
+	@Column({ nullable: true })
+	marketplaceDescription: string;
+
+	@Column({ nullable: true })
+	marketplaceCategory: string;
+
+	@Column({ default: 0 })
+	marketplaceDownloads: number;
+
+	@Index()
+	@Column({ default: false })
+	marketplaceIsPublic: boolean;
 }
 
 /**

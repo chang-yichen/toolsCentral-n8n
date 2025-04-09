@@ -1,19 +1,29 @@
 import type { IRestApiContext } from '@/Interface'; // Assuming context type path
 import { makeRestApiRequest } from '@/utils/apiUtils';
 
-// Define interfaces for expected data structures (align with backend)
+// Backend response structure
+interface WorkflowResponse {
+	id: string;
+	name: string;
+	marketplaceDescription: string;
+	marketplaceCategory: string;
+	createdAt: string;
+	updatedAt: string;
+	marketplaceDownloads: number;
+	marketplaceIsPublic: boolean;
+}
+
+// Frontend interface for marketplace workflows
 interface MarketplaceWorkflow {
 	id: string;
 	name: string;
 	description: string;
 	category: string;
-	authorId: string;
-	authorName: string;
-	downloads: number;
-	isPublic: boolean;
-	createdAt: string; // Assuming ISO string date
+	createdAt: string;
 	updatedAt: string;
-	// workflowJson might not be needed on the frontend list view
+	downloads: number;
+	author: string;
+	isPublic: boolean;
 }
 
 interface UserWorkflow {
@@ -32,12 +42,27 @@ interface PublishData {
 
 const BASE_ENDPOINT = '/marketplace';
 
+// Transform from backend to frontend format
+function transformToFrontendFormat(workflow: WorkflowResponse): MarketplaceWorkflow {
+	return {
+		id: workflow.id,
+		name: workflow.name,
+		description: workflow.marketplaceDescription || '',
+		category: workflow.marketplaceCategory || 'Other',
+		createdAt: workflow.createdAt,
+		updatedAt: workflow.updatedAt,
+		downloads: workflow.marketplaceDownloads || 0,
+		author: 'n8n community',
+		isPublic: workflow.marketplaceIsPublic,
+	};
+}
+
 // Function to get marketplace workflows
 export async function getMarketplaceWorkflows(
 	context: IRestApiContext,
 ): Promise<MarketplaceWorkflow[]> {
-	// GET /marketplace
-	return await makeRestApiRequest<MarketplaceWorkflow[]>(context, 'GET', BASE_ENDPOINT);
+	const response = await makeRestApiRequest<WorkflowResponse[]>(context, 'GET', BASE_ENDPOINT);
+	return response.map(transformToFrontendFormat);
 }
 
 // Function to get user's workflows for publishing dropdown
@@ -55,13 +80,23 @@ export async function publishToMarketplace(
 	context: IRestApiContext,
 	data: PublishData,
 ): Promise<MarketplaceWorkflow> {
-	// POST /marketplace/publish
-	return await makeRestApiRequest<MarketplaceWorkflow>(
+	// Transform to backend format
+	const transformedData = {
+		name: data.name,
+		workflowId: data.workflowId,
+		description: data.description,
+		category: data.category,
+		isPublic: data.isPublic,
+	};
+
+	const response = await makeRestApiRequest<WorkflowResponse>(
 		context,
 		'POST',
 		`${BASE_ENDPOINT}/publish`,
-		data,
+		transformedData,
 	);
+
+	return transformToFrontendFormat(response);
 }
 
 // Function to import a workflow (copy to user's workflows)
@@ -69,11 +104,31 @@ export async function importMarketplaceWorkflow(
 	context: IRestApiContext,
 	marketplaceWorkflowId: string,
 ): Promise<UserWorkflow> {
-	// Returns the newly created user workflow
-	// POST /marketplace/import/:id
-	return await makeRestApiRequest<UserWorkflow>(
-		context,
-		'POST',
-		`${BASE_ENDPOINT}/import/${marketplaceWorkflowId}`,
-	);
+	// Validate input
+	if (!marketplaceWorkflowId || typeof marketplaceWorkflowId !== 'string') {
+		throw new Error('Invalid workflow ID provided');
+	}
+
+	// Make sure we're passing the ID as a clean string without any potential objects
+	const cleanId = marketplaceWorkflowId.toString().trim();
+
+	try {
+		// Returns the newly created user workflow
+		// POST /marketplace/import/:id
+		return await makeRestApiRequest<UserWorkflow>(
+			context,
+			'POST',
+			`${BASE_ENDPOINT}/import/${cleanId}`,
+		);
+	} catch (error) {
+		console.error('Error importing workflow:', error);
+
+		// Enhance error message if needed
+		if (error.message && error.message.includes('not found')) {
+			throw new Error(`Workflow not found. Please check if the workflow exists and is published.`);
+		}
+
+		// Re-throw the error with additional context
+		throw error;
+	}
 }

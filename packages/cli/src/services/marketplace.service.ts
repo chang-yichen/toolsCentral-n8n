@@ -3,23 +3,14 @@ import { Repository, In } from '@n8n/typeorm';
 import type { FindOptionsWhere } from '@n8n/typeorm';
 import { Logger } from 'n8n-core';
 
-import { MarketplaceWorkflowEntity } from '../databases/entities/marketplace-workflow-entity';
 import { WorkflowEntity } from '../databases/entities/workflow-entity';
 import { User } from '../databases/entities/user';
 import { SharedWorkflow } from '../databases/entities/shared-workflow';
 import { SharedWorkflowRepository } from '../databases/repositories/shared-workflow.repository';
-import { MarketplaceWorkflowRepository } from '../databases/repositories/marketplace-workflow.repository';
 import { WorkflowRepository } from '../databases/repositories/workflow.repository';
 import { NotFoundError } from '../errors/response-errors/not-found.error';
 import { ForbiddenError } from '../errors/response-errors/forbidden.error';
 import { ProjectRepository } from '../databases/repositories/project.repository';
-
-interface StoredWorkflowData {
-	nodes: any[]; // Use any[] for simplicity if INode causes issues
-	connections: any; // Use any for simplicity if IConnections causes issues
-	settings?: any;
-	staticData?: any;
-}
 
 interface PublishWorkflowData {
 	name: string;
@@ -35,15 +26,11 @@ export class MarketplaceService {
 
 	constructor(
 		logger: Logger,
-		private readonly marketplaceRepository: MarketplaceWorkflowRepository,
 		private readonly workflowRepository: WorkflowRepository,
 		private readonly sharedWorkflowRepository: SharedWorkflowRepository,
 		private readonly projectRepository: ProjectRepository,
 	) {
 		this.logger = logger;
-		this.logger.info(
-			`MarketplaceService instantiated. marketplaceRepository defined: ${!!this.marketplaceRepository}`,
-		);
 		this.logger.info(
 			`MarketplaceService instantiated. workflowRepository defined: ${!!this.workflowRepository}`,
 		);
@@ -55,129 +42,356 @@ export class MarketplaceService {
 		);
 	}
 
-	async findAll(user: User): Promise<MarketplaceWorkflowEntity[]> {
-		return await this.marketplaceRepository.find({
-			where: [{ isPublic: true }, { createdByUserId: user.id }],
-			order: { createdAt: 'DESC' },
+	/**
+	 * Find all published workflows for the marketplace
+	 */
+	async findAll(user: User): Promise<WorkflowEntity[]> {
+		// First, find all workflows that are published and public for everyone
+		const publicWorkflows = await this.workflowRepository.find({
+			where: {
+				marketplaceIsPublic: true,
+				isPublished: true,
+			},
+			order: { updatedAt: 'DESC' },
+			select: [
+				'id',
+				'name',
+				'marketplaceDescription',
+				'marketplaceCategory',
+				'marketplaceDownloads',
+				'marketplaceIsPublic',
+				'createdAt',
+				'updatedAt',
+			],
 		});
+
+		// Next, find all workflows the user can access that are published
+		const userWorkflowsInfo = await this.sharedWorkflowRepository.findAllWorkflowsForUser(user, [
+			'workflow:read',
+		]);
+		const userWorkflowIds = userWorkflowsInfo.map((wf) => wf.id).filter((id) => id != null);
+
+		// If user has no workflows, return just public ones
+		if (userWorkflowIds.length === 0) {
+			return publicWorkflows;
+		}
+
+		// Find the user's published workflows
+		const userPublishedWorkflows = await this.workflowRepository.find({
+			where: {
+				id: In(userWorkflowIds),
+				isPublished: true,
+			},
+			order: { updatedAt: 'DESC' },
+			select: [
+				'id',
+				'name',
+				'marketplaceDescription',
+				'marketplaceCategory',
+				'marketplaceDownloads',
+				'marketplaceIsPublic',
+				'createdAt',
+				'updatedAt',
+			],
+		});
+
+		// Combine and return unique workflows
+		const uniqueWorkflows = new Map();
+
+		// Add public workflows
+		publicWorkflows.forEach((workflow) => {
+			uniqueWorkflows.set(workflow.id, workflow);
+		});
+
+		// Add user's workflows, potentially overriding public ones if they're the same
+		userPublishedWorkflows.forEach((workflow) => {
+			uniqueWorkflows.set(workflow.id, workflow);
+		});
+
+		return Array.from(uniqueWorkflows.values());
 	}
 
-	async publish(user: User, data: PublishWorkflowData): Promise<MarketplaceWorkflowEntity> {
-		// Use findWorkflowForUser to check read access - adjust scopes if specific role needed
+	/**
+	 * Publish a workflow to the marketplace
+	 */
+	async publish(user: User, data: PublishWorkflowData): Promise<WorkflowEntity> {
+		// Use findWorkflowForUser to check read access
 		const workflow = await this.sharedWorkflowRepository.findWorkflowForUser(
 			data.workflowId,
 			user,
-			['workflow:read'],
+			['workflow:read', 'workflow:update'],
 		);
 
 		if (!workflow) {
 			throw new ForbiddenError('Permission denied or workflow not found');
 		}
 
-		const workflowJson: StoredWorkflowData = {
-			nodes: workflow.nodes,
-			connections: workflow.connections,
-			settings: workflow.settings,
-			staticData: workflow.staticData,
-		};
+		try {
+			// Only update the specific marketplace fields instead of the entire workflow object
+			// This prevents circular reference issues during JSON serialization
+			const updatedWorkflow = await this.workflowRepository.update(
+				{ id: workflow.id },
+				{
+					isPublished: true,
+					marketplaceDescription: data.description,
+					marketplaceCategory: data.category,
+					marketplaceIsPublic: data.isPublic ?? true,
+				},
+			);
 
-		let existingEntry = await this.marketplaceRepository.findOneBy({
-			originalWorkflowId: data.workflowId,
-			createdByUserId: user.id,
-		});
-
-		if (existingEntry) {
-			existingEntry.name = data.name;
-			existingEntry.description = data.description;
-			existingEntry.category = data.category;
-			existingEntry.workflowJson = workflowJson;
-			existingEntry.isPublic = data.isPublic ?? existingEntry.isPublic;
-			return await this.marketplaceRepository.save(existingEntry);
-		} else {
-			const newMarketplaceEntry = this.marketplaceRepository.create({
-				name: data.name,
-				description: data.description,
-				category: data.category,
-				authorId: user.id,
-				authorName: user.email,
-				workflowJson: workflowJson,
-				isPublic: data.isPublic ?? true,
-				originalWorkflowId: data.workflowId,
-				createdByUserId: user.id,
+			// Fetch the updated workflow to return
+			return await this.workflowRepository.findOneByOrFail({ id: workflow.id });
+		} catch (error) {
+			this.logger.error(`Error publishing workflow ${data.workflowId}: ${error.message}`, {
+				userId: user.id,
+				workflowId: data.workflowId,
 			});
-			return await this.marketplaceRepository.save(newMarketplaceEntry);
+			throw new Error(`Failed to publish workflow: ${error.message}`);
 		}
 	}
 
-	async import(user: User, marketplaceWorkflowId: string): Promise<WorkflowEntity> {
-		const marketplaceWorkflow = await this.marketplaceRepository.findOneBy({
-			id: marketplaceWorkflowId,
-		});
-		if (!marketplaceWorkflow) {
-			throw new NotFoundError('Marketplace workflow not found');
-		}
-
-		if (!marketplaceWorkflow.isPublic && marketplaceWorkflow.authorId !== user.id) {
-			throw new ForbiddenError('Cannot import this workflow');
-		}
-
-		const { nodes, connections, settings, staticData } = marketplaceWorkflow.workflowJson;
-
-		// Get the user's personal project to assign the imported workflow
-		const personalProject = await this.projectRepository.getPersonalProjectForUserOrFail(user.id);
-
-		const newWorkflowData = {
-			name: `${marketplaceWorkflow.name} (Imported)`,
-			nodes: nodes,
-			connections: connections,
-			settings: settings,
-			staticData: staticData,
-			active: false,
-			// versionId is required by WorkflowEntity
-			versionId: crypto.randomUUID(), // Generate a new version ID
-		};
-
-		// Use transaction to ensure workflow and sharing are created together
-		return await this.workflowRepository.manager.transaction(async (transactionalEntityManager) => {
-			const workflowRepo = transactionalEntityManager.getRepository(WorkflowEntity);
-			const sharedRepo = transactionalEntityManager.getRepository(SharedWorkflow);
-
-			const savedWorkflow = await workflowRepo.save(newWorkflowData);
-
-			const newSharing = sharedRepo.create({
-				workflowId: savedWorkflow.id,
-				projectId: personalProject.id,
-				role: 'workflow:owner',
+	/**
+	 * Import a workflow from the marketplace
+	 */
+	async import(user: User, workflowId: string): Promise<WorkflowEntity> {
+		// Validate the input workflowId to ensure it's a valid string
+		if (!workflowId || typeof workflowId !== 'string') {
+			this.logger.error(`Invalid workflow ID provided for import: ${typeof workflowId}`, {
+				userId: user.id,
 			});
-			await sharedRepo.save(newSharing);
+			throw new Error('Invalid workflow ID format provided');
+		}
 
-			// Increment downloads only if not the author
-			if (marketplaceWorkflow.authorId !== user.id) {
-				await this.marketplaceRepository.increment({ id: marketplaceWorkflowId }, 'downloads', 1);
+		try {
+			// Find the original workflow with only necessary fields
+			const sourceWorkflow = await this.workflowRepository.findOne({
+				where: {
+					id: workflowId,
+					isPublished: true,
+					marketplaceIsPublic: true,
+				},
+				select: ['id', 'name', 'nodes', 'connections', 'settings', 'staticData'],
+			});
+
+			if (!sourceWorkflow) {
+				throw new NotFoundError('Published workflow not found');
 			}
 
-			return savedWorkflow;
-		});
+			// Create a new workflow entity
+			const newWorkflow = new WorkflowEntity();
+
+			// Create a deep copy using JSON serialization with circular reference handling
+			// This ensures we break any circular references in the source workflow data
+			const safeNodes = this.safeClone(sourceWorkflow.nodes);
+			const safeConnections = this.safeClone(sourceWorkflow.connections);
+			const safeSettings = sourceWorkflow.settings
+				? this.safeClone(sourceWorkflow.settings)
+				: undefined;
+			const safeStaticData = sourceWorkflow.staticData
+				? this.safeClone(sourceWorkflow.staticData)
+				: undefined;
+
+			// Only copy essential properties with safe clones
+			newWorkflow.name = `${sourceWorkflow.name} (Imported)`;
+			newWorkflow.nodes = safeNodes;
+			newWorkflow.connections = safeConnections;
+			newWorkflow.settings = safeSettings;
+			newWorkflow.staticData = safeStaticData;
+			newWorkflow.active = false;
+			newWorkflow.versionId = crypto.randomUUID();
+
+			// Get the user's personal project
+			const personalProject = await this.projectRepository.getPersonalProjectForUserOrFail(user.id);
+
+			// Handle within a transaction
+			const savedWorkflow = await this.workflowRepository.manager.transaction(
+				async (transactionManager) => {
+					// Save the new workflow
+					const savedWf = await transactionManager.save(newWorkflow);
+
+					// Create the sharing relationship
+					const newSharing = new SharedWorkflow();
+					newSharing.workflowId = savedWf.id;
+					newSharing.projectId = personalProject.id;
+					newSharing.role = 'workflow:owner';
+					await transactionManager.save(newSharing);
+
+					// Increment download count for the source workflow
+					await transactionManager.increment(
+						WorkflowEntity,
+						{ id: workflowId },
+						'marketplaceDownloads',
+						1,
+					);
+
+					// Return a clean workflow object
+					return await transactionManager.findOne(WorkflowEntity, {
+						where: { id: savedWf.id },
+						select: ['id', 'name', 'active', 'createdAt', 'updatedAt'],
+					});
+				},
+			);
+
+			// Return the successfully imported workflow
+			return savedWorkflow as WorkflowEntity;
+		} catch (error) {
+			// Log more detailed information about the error
+			this.logger.error(`Error importing workflow ${workflowId}: ${error.message}`, {
+				userId: user.id,
+				workflowId,
+				errorName: error.name,
+				errorStack: error.stack,
+			});
+
+			// Handle different types of errors more specifically
+			if (error instanceof NotFoundError) {
+				throw error; // Pass through not found errors
+			} else if (error.message.includes('circular')) {
+				throw new Error(
+					'Failed to import workflow: The workflow contains circular references that cannot be processed.',
+				);
+			} else {
+				throw new Error(`Failed to import workflow: ${error.message}`);
+			}
+		}
 	}
 
+	/**
+	 * Helper method to safely clone objects without circular references
+	 * This breaks circular references by using a replacer function in JSON.stringify
+	 */
+	private safeClone<T>(obj: T): T {
+		if (!obj) return obj;
+
+		// Use a WeakSet to track objects that have been seen
+		const seen = new WeakSet();
+
+		// Custom replacer function to handle circular references
+		const replacer = (key: string, value: any) => {
+			// Skip non-object values and null
+			if (typeof value !== 'object' || value === null) {
+				return value;
+			}
+
+			// Specifically handle HTTP-related objects that commonly cause circular references
+			if (
+				// HTTP-related objects
+				value.constructor?.name === 'Socket' ||
+				value.constructor?.name === 'HTTPParser' ||
+				value.constructor?.name === 'IncomingMessage' ||
+				value.constructor?.name === 'ServerResponse' ||
+				value.constructor?.name === 'ClientRequest' ||
+				// Node.js internal objects
+				value.constructor?.name === 'Server' ||
+				// Check for specific properties that indicate request/response objects
+				value.req ||
+				value.res ||
+				value._httpMessage ||
+				value.socket
+			) {
+				// Replace these objects with a placeholder to break the circular reference
+				return {
+					_type: value.constructor?.name || 'ServerObject',
+					_placeholder: true,
+					_isNonSerializable: true,
+				};
+			}
+
+			// Check if we've seen this object before
+			if (seen.has(value)) {
+				// Return a simplified reference to avoid circular references
+				return { _circular: true };
+			}
+
+			// Add the object to our tracking set
+			seen.add(value);
+
+			// Return the value for further processing
+			return value;
+		};
+
+		try {
+			// Stringify and re-parse to create a deep clone without circular references
+			return JSON.parse(JSON.stringify(obj, replacer));
+		} catch (error) {
+			// If JSON.stringify still fails, fall back to a more aggressive approach
+			this.logger.warn(`Failed to clone object safely with replacer: ${error.message}`);
+
+			// Create a minimal copy with only essential data
+			return this.createMinimalCopy(obj);
+		}
+	}
+
+	/**
+	 * Fallback method to create a minimal copy of an object
+	 * Used when the standard safeClone method fails
+	 */
+	private createMinimalCopy<T>(obj: T): T {
+		if (!obj || typeof obj !== 'object') {
+			return obj;
+		}
+
+		// For arrays, map each element and process it
+		if (Array.isArray(obj)) {
+			return obj.map((item) => this.createMinimalCopy(item)) as unknown as T;
+		}
+
+		// For objects, create a new object with minimal properties
+		const safeCopy: any = {};
+
+		// Copy only primitive values and simple objects
+		for (const [key, value] of Object.entries(obj)) {
+			if (value === null || value === undefined) {
+				safeCopy[key] = value;
+			} else if (typeof value !== 'object') {
+				// Primitive values are safe to copy directly
+				safeCopy[key] = value;
+			} else if (Array.isArray(value)) {
+				// Process arrays recursively
+				safeCopy[key] = this.createMinimalCopy(value);
+			} else if (Object.prototype.toString.call(value) === '[object Object]') {
+				// Regular objects need to be processed recursively, but skip complex objects
+				const constructor = value.constructor?.name;
+				if (constructor === 'Object') {
+					safeCopy[key] = this.createMinimalCopy(value);
+				} else {
+					// For complex objects, store a placeholder
+					safeCopy[key] = { _type: constructor, _placeholder: true };
+				}
+			} else {
+				// For any other types, just use a placeholder
+				safeCopy[key] = { _type: typeof value, _placeholder: true };
+			}
+		}
+
+		return safeCopy as T;
+	}
+
+	/**
+	 * Find user's workflows for publishing
+	 */
 	async findUserWorkflows(user: User): Promise<WorkflowEntity[]> {
-		// Request read scope to find workflows user can see
+		// Find workflows the user can publish
 		const workflowInfos = await this.sharedWorkflowRepository.findAllWorkflowsForUser(user, [
 			'workflow:read',
+			'workflow:update',
 		]);
 
 		if (!workflowInfos || workflowInfos.length === 0) {
 			return [];
 		}
 
-		// Extract the workflow IDs from the returned objects
+		// Extract workflow IDs
 		const workflowIds = workflowInfos.map((wf) => wf.id).filter((id) => id != null);
 
 		if (workflowIds.length === 0) {
 			return [];
 		}
 
-		// Fetch the full WorkflowEntity instances using the IDs
-		return await this.workflowRepository.findBy({ id: In(workflowIds) });
+		// Fetch workflow details with only necessary fields to avoid circular references
+		return await this.workflowRepository.find({
+			where: { id: In(workflowIds) },
+			select: ['id', 'name', 'active', 'createdAt', 'updatedAt'],
+		});
 	}
 }

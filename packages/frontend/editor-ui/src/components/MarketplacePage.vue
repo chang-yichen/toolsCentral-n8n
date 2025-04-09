@@ -395,6 +395,14 @@ export default {
 
 		const importWorkflow = async (workflowToImport) => {
 			try {
+				// Ensure we have a valid ID object
+				if (!workflowToImport || !workflowToImport.id) {
+					throw new Error('Invalid workflow selected for import');
+				}
+
+				// Log the workflow ID for debugging
+				console.log('Importing workflow with ID:', workflowToImport.id);
+
 				const importedWf = await importMarketplaceWorkflow(
 					restApiContext.value,
 					workflowToImport.id,
@@ -403,7 +411,22 @@ export default {
 				selectedWorkflow.value = null;
 			} catch (err) {
 				console.error('Error importing workflow:', err);
-				alert('Failed to import workflow: ' + (err.message || 'Unknown error'));
+
+				// Provide more specific error messages based on the error type
+				if (err.message && err.message.includes('circular references')) {
+					alert(
+						'This workflow contains complex HTTP connections that cannot be automatically imported. ' +
+							'Please contact the administrator or try importing a different workflow.',
+					);
+				} else if (err.message && err.message.includes('not found')) {
+					alert('This workflow is no longer available in the marketplace.');
+				} else if (err.response && err.response.status === 404) {
+					alert('This workflow is no longer available in the marketplace.');
+				} else if (err.response && err.response.status === 403) {
+					alert('You do not have permission to import this workflow.');
+				} else {
+					alert('Failed to import workflow: ' + (err.message || 'Unknown error'));
+				}
 			}
 		};
 

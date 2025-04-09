@@ -81,6 +81,7 @@ import { AddErrorColumnsToTestRuns1737715421462 } from '../common/1737715421462-
 import { CreateAnalyticsTables1739549398681 } from '../common/1739549398681-CreateAnalyticsTables';
 import { RenameAnalyticsToInsights1741167584277 } from '../common/1741167584277-RenameAnalyticsToInsights';
 import { CreateMarketplaceWorkflowTable1711996600000 } from './1711996600000-CreateMarketplaceWorkflowTable';
+import { AddMarketplaceFieldsToWorkflow1800000000000 } from './1800000000000-AddMarketplaceFieldsToWorkflow';
 
 const sqliteMigrations: Migration[] = [
 	InitialMigration1588102412422,
@@ -164,6 +165,7 @@ const sqliteMigrations: Migration[] = [
 	UpdateParentFolderIdColumn1740445074052,
 	RenameAnalyticsToInsights1741167584277,
 	CreateMarketplaceWorkflowTable1711996600000,
+	AddMarketplaceFieldsToWorkflow1800000000000,
 ];
 
 export { sqliteMigrations };
