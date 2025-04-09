@@ -90,7 +90,13 @@ export const routes: RouteRecordRaw[] = [
 	{
 		path: '/marketplace',
 		name: 'marketplace',
-		component: MarketplacePage,
+		components: {
+			default: MarketplacePage,
+			sidebar: MainSidebar,
+		},
+		meta: {
+			middleware: ['authenticated'],
+		},
 	},
 	{
 		path: '/collections/:id',

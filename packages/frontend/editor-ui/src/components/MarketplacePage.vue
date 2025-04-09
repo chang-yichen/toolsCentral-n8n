@@ -1,235 +1,213 @@
 <template>
-	<PageViewLayout>
-		<div class="marketplace-page">
-			<!-- Publishing Banner at the top -->
-			<div class="publish-banner">
-				<div class="publish-banner-content">
-					<div class="banner-text">
-						<h2>Publish Your Workflow</h2>
-						<p>Share your automation workflows with the n8n community</p>
+	<div class="marketplace-page">
+		<!-- Publishing Banner at the top -->
+		<div class="publish-banner">
+			<div class="publish-banner-content">
+				<div class="banner-text">
+					<h2>Publish Your Workflow</h2>
+					<p>Share your automation workflows with the n8n community</p>
+				</div>
+				<n8n-button label="Publish Workflow" type="primary" size="large" @click="openPublishForm" />
+			</div>
+		</div>
+
+		<h1>Workflow Marketplace</h1>
+		<p class="marketplace-description">
+			Discover and share workflows with the community. Browse the available workflows below.
+		</p>
+
+		<!-- Filter options -->
+		<div class="marketplace-filters">
+			<div class="search-container">
+				<n8n-input v-model="searchTerm" placeholder="Search workflows..." @input="filterWorkflows">
+					<template #prefix>
+						<n8n-icon icon="search" />
+					</template>
+				</n8n-input>
+			</div>
+			<div class="category-filter">
+				<n8n-select
+					v-model="selectedCategory"
+					placeholder="All Categories"
+					@change="filterWorkflows"
+				>
+					<n8n-option value="">All Categories</n8n-option>
+					<n8n-option value="automation">Automation</n8n-option>
+					<n8n-option value="data-processing">Data Processing</n8n-option>
+					<n8n-option value="integration">Integration</n8n-option>
+					<n8n-option value="utility">Utility</n8n-option>
+				</n8n-select>
+			</div>
+			<div class="sort-by">
+				<n8n-select v-model="sortBy" placeholder="Sort by" @change="filterWorkflows">
+					<n8n-option value="recent">Most Recent</n8n-option>
+					<n8n-option value="popular">Most Popular</n8n-option>
+					<n8n-option value="name">Name (A-Z)</n8n-option>
+				</n8n-select>
+			</div>
+		</div>
+
+		<!-- Publish Form Modal -->
+		<div v-if="showPublishForm" class="modal-overlay" @click="showPublishForm = false">
+			<div class="publish-form-modal" @click.stop>
+				<div class="modal-header">
+					<h2>Publish a Workflow</h2>
+					<button class="close-button" @click="showPublishForm = false">×</button>
+				</div>
+				<form @submit.prevent="publishWorkflow">
+					<!-- Workflow Selection -->
+					<div class="form-group">
+						<label for="workflowSelect">Select a Workflow</label>
+						<n8n-select
+							id="workflowSelect"
+							v-model="selectedWorkflowId"
+							placeholder="Select workflow to publish"
+							@change="onWorkflowSelected"
+						>
+							<n8n-option v-for="workflow in userWorkflows" :key="workflow.id" :value="workflow.id">
+								{{ workflow.name }}
+							</n8n-option>
+						</n8n-select>
 					</div>
-					<n8n-button
-						label="Publish Workflow"
-						type="primary"
-						size="large"
-						@click="openPublishForm"
-					/>
-				</div>
-			</div>
 
-			<h1>Workflow Marketplace</h1>
-			<p class="marketplace-description">
-				Discover and share workflows with the community. Browse the available workflows below.
-			</p>
-
-			<!-- Filter options -->
-			<div class="marketplace-filters">
-				<div class="search-container">
-					<n8n-input
-						v-model="searchTerm"
-						placeholder="Search workflows..."
-						@input="filterWorkflows"
-					>
-						<template #prefix>
-							<n8n-icon icon="search" />
-						</template>
-					</n8n-input>
-				</div>
-				<div class="category-filter">
-					<n8n-select
-						v-model="selectedCategory"
-						placeholder="All Categories"
-						@change="filterWorkflows"
-					>
-						<n8n-option value="">All Categories</n8n-option>
-						<n8n-option value="automation">Automation</n8n-option>
-						<n8n-option value="data-processing">Data Processing</n8n-option>
-						<n8n-option value="integration">Integration</n8n-option>
-						<n8n-option value="utility">Utility</n8n-option>
-					</n8n-select>
-				</div>
-				<div class="sort-by">
-					<n8n-select v-model="sortBy" placeholder="Sort by" @change="filterWorkflows">
-						<n8n-option value="recent">Most Recent</n8n-option>
-						<n8n-option value="popular">Most Popular</n8n-option>
-						<n8n-option value="name">Name (A-Z)</n8n-option>
-					</n8n-select>
-				</div>
-			</div>
-
-			<!-- Publish Form Modal -->
-			<div v-if="showPublishForm" class="modal-overlay" @click="showPublishForm = false">
-				<div class="publish-form-modal" @click.stop>
-					<div class="modal-header">
-						<h2>Publish a Workflow</h2>
-						<button class="close-button" @click="showPublishForm = false">×</button>
+					<div class="form-group">
+						<label for="name">Workflow Name</label>
+						<n8n-input
+							id="name"
+							v-model="publishForm.name"
+							placeholder="Enter workflow name"
+							required
+						/>
 					</div>
-					<form @submit.prevent="publishWorkflow">
-						<!-- Workflow Selection -->
-						<div class="form-group">
-							<label for="workflowSelect">Select a Workflow</label>
-							<n8n-select
-								id="workflowSelect"
-								v-model="selectedWorkflowId"
-								placeholder="Select workflow to publish"
-								@change="onWorkflowSelected"
-							>
-								<n8n-option
-									v-for="workflow in userWorkflows"
-									:key="workflow.id"
-									:value="workflow.id"
-								>
-									{{ workflow.name }}
-								</n8n-option>
-							</n8n-select>
-						</div>
-
-						<div class="form-group">
-							<label for="name">Workflow Name</label>
-							<n8n-input
-								id="name"
-								v-model="publishForm.name"
-								placeholder="Enter workflow name"
-								required
-							/>
-						</div>
-						<div class="form-group">
-							<label for="description">Description</label>
-							<n8n-input
-								id="description"
-								v-model="publishForm.description"
-								type="textarea"
-								placeholder="Enter description"
-								required
-							/>
-						</div>
-						<div class="form-group">
-							<label for="category">Category</label>
-							<n8n-select
-								id="category"
-								v-model="publishForm.category"
-								placeholder="Select category"
-							>
-								<n8n-option value="automation">Automation</n8n-option>
-								<n8n-option value="data-processing">Data Processing</n8n-option>
-								<n8n-option value="integration">Integration</n8n-option>
-								<n8n-option value="utility">Utility</n8n-option>
-							</n8n-select>
-						</div>
-						<div class="form-group checkbox">
-							<n8n-checkbox v-model="publishForm.isPublic">Make workflow public</n8n-checkbox>
-						</div>
-						<div class="form-actions">
-							<n8n-button type="secondary" @click="showPublishForm = false">Cancel</n8n-button>
-							<n8n-button type="primary" :loading="publishing" native-type="submit"
-								>Publish</n8n-button
-							>
-						</div>
-					</form>
-				</div>
-			</div>
-
-			<div v-if="loading" class="marketplace-content">
-				<n8n-loading :rows="3" :loading="loading" />
-			</div>
-			<div v-else-if="error" class="marketplace-content error">
-				<p>{{ error }}</p>
-				<n8n-button @click="fetchWorkflows" label="Try Again" type="primary" size="medium" />
-			</div>
-			<div
-				v-else-if="workflowsLoaded && filteredWorkflows.length === 0"
-				class="marketplace-content empty"
-			>
-				<n8n-icon icon="box-open" size="xlarge" />
-				<p>No workflows found in the marketplace.</p>
-				<n8n-button @click="resetFilters" label="Reset Filters" type="tertiary" size="medium" />
-			</div>
-			<div v-else-if="workflowsLoaded" class="marketplace-workflows">
-				<div class="workflow-cards">
-					<div
-						v-for="workflow in filteredWorkflows"
-						:key="workflow.id"
-						class="workflow-card"
-						@click="viewWorkflowDetails(workflow)"
-					>
-						<div class="card-header">
-							<h3>{{ workflow.name }}</h3>
-							<div class="category-tag">{{ workflow.category }}</div>
-						</div>
-						<p class="card-description">{{ workflow.description }}</p>
-						<div class="card-footer">
-							<div class="author">
-								<n8n-avatar :first-name="workflow.author" size="small" />
-								<span>{{ workflow.author }}</span>
-							</div>
-							<div class="stats">
-								<div class="stat-item">
-									<n8n-icon icon="download" size="small" />
-									<span>{{ workflow.downloads }}</span>
-								</div>
-								<div class="stat-item">
-									<n8n-icon icon="calendar" size="small" />
-									<span>{{ formatDate(workflow.createdAt) }}</span>
-								</div>
-							</div>
-						</div>
+					<div class="form-group">
+						<label for="description">Description</label>
+						<n8n-input
+							id="description"
+							v-model="publishForm.description"
+							type="textarea"
+							placeholder="Enter description"
+							required
+						/>
 					</div>
-				</div>
-			</div>
-
-			<!-- Workflow Details Modal -->
-			<div v-if="selectedWorkflow" class="modal-overlay" @click="selectedWorkflow = null">
-				<div class="workflow-modal" @click.stop>
-					<div class="modal-header">
-						<h2>{{ selectedWorkflow.name }}</h2>
-						<button class="close-button" @click="selectedWorkflow = null">×</button>
+					<div class="form-group">
+						<label for="category">Category</label>
+						<n8n-select id="category" v-model="publishForm.category" placeholder="Select category">
+							<n8n-option value="automation">Automation</n8n-option>
+							<n8n-option value="data-processing">Data Processing</n8n-option>
+							<n8n-option value="integration">Integration</n8n-option>
+							<n8n-option value="utility">Utility</n8n-option>
+						</n8n-select>
 					</div>
-					<div class="modal-content">
-						<p class="description">{{ selectedWorkflow.description }}</p>
+					<div class="form-group checkbox">
+						<n8n-checkbox v-model="publishForm.isPublic">Make workflow public</n8n-checkbox>
+					</div>
+					<div class="form-actions">
+						<n8n-button type="secondary" @click="showPublishForm = false">Cancel</n8n-button>
+						<n8n-button type="primary" :loading="publishing" native-type="submit"
+							>Publish</n8n-button
+						>
+					</div>
+				</form>
+			</div>
+		</div>
 
-						<div class="details-meta">
-							<div class="meta-item">
-								<n8n-icon icon="user" />
-								<span><strong>Author:</strong> {{ selectedWorkflow.author }}</span>
-							</div>
-							<div class="meta-item">
-								<n8n-icon icon="download" />
-								<span><strong>Downloads:</strong> {{ selectedWorkflow.downloads }}</span>
-							</div>
-							<div class="meta-item">
-								<n8n-icon icon="tag" />
-								<span><strong>Category:</strong> {{ selectedWorkflow.category }}</span>
-							</div>
-							<div class="meta-item">
-								<n8n-icon icon="calendar" />
-								<span
-									><strong>Published:</strong> {{ formatDate(selectedWorkflow.createdAt) }}</span
-								>
-							</div>
+		<div v-if="loading" class="marketplace-content">
+			<n8n-loading :rows="3" :loading="loading" />
+		</div>
+		<div v-else-if="error" class="marketplace-content error">
+			<p>{{ error }}</p>
+			<n8n-button @click="fetchWorkflows" label="Try Again" type="primary" size="medium" />
+		</div>
+		<div
+			v-else-if="workflowsLoaded && filteredWorkflows.length === 0"
+			class="marketplace-content empty"
+		>
+			<n8n-icon icon="box-open" size="xlarge" />
+			<p>No workflows found in the marketplace.</p>
+			<n8n-button @click="resetFilters" label="Reset Filters" type="tertiary" size="medium" />
+		</div>
+		<div v-else-if="workflowsLoaded" class="marketplace-workflows">
+			<div class="workflow-cards">
+				<div
+					v-for="workflow in filteredWorkflows"
+					:key="workflow.id"
+					class="workflow-card"
+					@click="viewWorkflowDetails(workflow)"
+				>
+					<div class="card-header">
+						<h3>{{ workflow.name }}</h3>
+						<div class="category-tag">{{ workflow.category }}</div>
+					</div>
+					<p class="card-description">{{ workflow.description }}</p>
+					<div class="card-footer">
+						<div class="author">
+							<n8n-avatar :first-name="workflow.author" size="small" />
+							<span>{{ workflow.author }}</span>
 						</div>
-
-						<div class="action-buttons">
-							<n8n-button
-								label="Copy to My Workflows"
-								type="primary"
-								@click="importWorkflow(selectedWorkflow)"
-							>
-								<template #icon>
-									<n8n-icon icon="plus" />
-								</template>
-							</n8n-button>
+						<div class="stats">
+							<div class="stat-item">
+								<n8n-icon icon="download" size="small" />
+								<span>{{ workflow.downloads }}</span>
+							</div>
+							<div class="stat-item">
+								<n8n-icon icon="calendar" size="small" />
+								<span>{{ formatDate(workflow.createdAt) }}</span>
+							</div>
 						</div>
 					</div>
 				</div>
 			</div>
 		</div>
-	</PageViewLayout>
+
+		<!-- Workflow Details Modal -->
+		<div v-if="selectedWorkflow" class="modal-overlay" @click="selectedWorkflow = null">
+			<div class="workflow-modal" @click.stop>
+				<div class="modal-header">
+					<h2>{{ selectedWorkflow.name }}</h2>
+					<button class="close-button" @click="selectedWorkflow = null">×</button>
+				</div>
+				<div class="modal-content">
+					<p class="description">{{ selectedWorkflow.description }}</p>
+
+					<div class="details-meta">
+						<div class="meta-item">
+							<n8n-icon icon="user" />
+							<span><strong>Author:</strong> {{ selectedWorkflow.author }}</span>
+						</div>
+						<div class="meta-item">
+							<n8n-icon icon="download" />
+							<span><strong>Downloads:</strong> {{ selectedWorkflow.downloads }}</span>
+						</div>
+						<div class="meta-item">
+							<n8n-icon icon="tag" />
+							<span><strong>Category:</strong> {{ selectedWorkflow.category }}</span>
+						</div>
+						<div class="meta-item">
+							<n8n-icon icon="calendar" />
+							<span><strong>Published:</strong> {{ formatDate(selectedWorkflow.createdAt) }}</span>
+						</div>
+					</div>
+
+					<div class="action-buttons">
+						<n8n-button
+							label="Copy to My Workflows"
+							type="primary"
+							@click="importWorkflow(selectedWorkflow)"
+						>
+							<template #icon>
+								<n8n-icon icon="plus" />
+							</template>
+						</n8n-button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
 </template>
 
 <script>
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { PageViewLayout } from '@/components/layouts';
 import { useRootStore } from '@/stores/root.store';
 import {
 	getMarketplaceWorkflows,
@@ -240,9 +218,7 @@ import {
 
 export default {
 	name: 'MarketplacePage',
-	components: {
-		PageViewLayout,
-	},
+	components: {},
 	setup() {
 		const route = useRoute();
 		const router = useRouter();
@@ -480,13 +456,15 @@ export default {
 
 <style lang="scss" scoped>
 .marketplace-page {
-	padding: 0;
-	max-width: 1200px;
+	padding: 20px;
+	width: 100%;
 	margin: 0 auto;
 	text-align: center;
+	overflow-y: auto;
+	height: 100%;
 
 	h1 {
-		margin: 1.5em 0 0.5em;
+		margin: 1em 0 0.5em;
 		font-size: 28px;
 	}
 
@@ -507,7 +485,6 @@ export default {
 			display: flex;
 			justify-content: space-between;
 			align-items: center;
-			max-width: 1000px;
 			margin: 0 auto;
 		}
 
@@ -573,6 +550,9 @@ export default {
 
 	.marketplace-workflows {
 		margin: 2em 0;
+		width: 100%;
+		display: flex;
+		justify-content: center;
 	}
 
 	.workflow-cards {
@@ -580,6 +560,8 @@ export default {
 		grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
 		gap: 1.5em;
 		text-align: left;
+		max-width: 1200px;
+		width: 100%;
 	}
 
 	.workflow-card {
