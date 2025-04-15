@@ -21,6 +21,7 @@
     "dist/**/*"
   ],
   "dependencies": {
+    "anthropic": "^0.0.0",
     "axios": "catalog:"
   },
   "devDependencies": {

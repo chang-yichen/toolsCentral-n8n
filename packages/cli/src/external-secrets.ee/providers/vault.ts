@@ -248,13 +248,13 @@ export class VaultProvider extends SecretsProvider {
 		this.#http = axios.create({ baseURL: baseURL.toString() });
 		if (this.settings.namespace) {
 			this.#http.interceptors.request.use((config) => {
-				config.headers['X-Vault-Namespace'] = this.settings.namespace;
+				(config.headers as any)['X-Vault-Namespace'] = this.settings.namespace;
 				return config;
 			});
 		}
 		this.#http.interceptors.request.use((config) => {
 			if (this.#currentToken) {
-				config.headers['X-Vault-Token'] = this.#currentToken;
+				(config.headers as any)['X-Vault-Token'] = this.#currentToken;
 			}
 			return config;
 		});

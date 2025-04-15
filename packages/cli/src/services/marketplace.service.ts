@@ -11,6 +11,7 @@ import { WorkflowRepository } from '../databases/repositories/workflow.repositor
 import { NotFoundError } from '../errors/response-errors/not-found.error';
 import { ForbiddenError } from '../errors/response-errors/forbidden.error';
 import { ProjectRepository } from '../databases/repositories/project.repository';
+import { LlmDescriptionService } from './llm-description.service';
 
 interface PublishWorkflowData {
 	name: string;
@@ -18,6 +19,7 @@ interface PublishWorkflowData {
 	category: string;
 	workflowId: string;
 	isPublic?: boolean;
+	useAutoDescription?: boolean;
 }
 
 @Service()
@@ -29,6 +31,7 @@ export class MarketplaceService {
 		private readonly workflowRepository: WorkflowRepository,
 		private readonly sharedWorkflowRepository: SharedWorkflowRepository,
 		private readonly projectRepository: ProjectRepository,
+		private readonly llmDescriptionService: LlmDescriptionService,
 	) {
 		this.logger = logger;
 		this.logger.info(
@@ -127,13 +130,27 @@ export class MarketplaceService {
 		}
 
 		try {
+			// If user opted for auto-description, generate it using LLM
+			let description = data.description;
+			if (data.useAutoDescription) {
+				const generatedDescription =
+					await this.llmDescriptionService.generateWorkflowDescription(workflow);
+				if (generatedDescription) {
+					description = generatedDescription;
+					this.logger.debug('Generated workflow description using LLM', {
+						workflowId: workflow.id,
+						description: generatedDescription,
+					});
+				}
+			}
+
 			// Only update the specific marketplace fields instead of the entire workflow object
 			// This prevents circular reference issues during JSON serialization
 			const updatedWorkflow = await this.workflowRepository.update(
 				{ id: workflow.id },
 				{
 					isPublished: true,
-					marketplaceDescription: data.description,
+					marketplaceDescription: description,
 					marketplaceCategory: data.category,
 					marketplaceIsPublic: data.isPublic ?? true,
 				},
@@ -393,5 +410,40 @@ export class MarketplaceService {
 			where: { id: In(workflowIds) },
 			select: ['id', 'name', 'active', 'createdAt', 'updatedAt'],
 		});
+	}
+
+	/**
+	 * Generate a preview of the automatic description for a workflow
+	 */
+	async generateDescriptionPreview(user: User, workflowId: string): Promise<string> {
+		// Check read access to the workflow
+		const workflow = await this.sharedWorkflowRepository.findWorkflowForUser(workflowId, user, [
+			'workflow:read',
+		]);
+
+		if (!workflow) {
+			throw new ForbiddenError('Permission denied or workflow not found');
+		}
+
+		try {
+			// Generate description using LLM
+			const generatedDescription =
+				await this.llmDescriptionService.generateWorkflowDescription(workflow);
+
+			if (!generatedDescription) {
+				return 'Unable to generate a description. Please provide one manually.';
+			}
+
+			return generatedDescription;
+		} catch (error) {
+			this.logger.error(
+				`Error generating preview description for workflow ${workflowId}: ${error.message}`,
+				{
+					userId: user.id,
+					workflowId,
+				},
+			);
+			throw new Error(`Failed to generate description preview: ${error.message}`);
+		}
 	}
 }

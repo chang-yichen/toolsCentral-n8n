@@ -16,6 +16,7 @@ interface PublishWorkflowDto {
 	category: string;
 	workflowId: string;
 	isPublic?: boolean;
+	useAutoDescription?: boolean;
 }
 
 // Interface for a clean workflow response without circular references
@@ -71,11 +72,20 @@ export class MarketplaceController {
 		if (
 			!publishDto ||
 			!publishDto.name ||
-			!publishDto.description ||
+			(!publishDto.description && !publishDto.useAutoDescription) ||
 			!publishDto.category ||
 			!publishDto.workflowId
 		) {
-			throw new BadRequestError('Invalid request body for publishing workflow');
+			throw new BadRequestError(
+				'Invalid request body for publishing workflow. Must include name, description (or enable auto-description), category, and workflowId.',
+			);
+		}
+
+		// If description is empty but auto-description is enabled, we'll proceed
+		if (!publishDto.description && !publishDto.useAutoDescription) {
+			throw new BadRequestError(
+				'Please provide a description or enable auto-description generation.',
+			);
 		}
 
 		try {
@@ -161,6 +171,29 @@ export class MarketplaceController {
 		} catch (error) {
 			// Handle errors without circular references
 			throw new Error(`Error fetching user workflows: ${error.message}`);
+		}
+	}
+
+	// Endpoint to preview auto-generated description
+	@Get('/preview-description/:id')
+	async previewDescription(req: AuthenticatedRequest) {
+		try {
+			// Extract the workflow ID from params
+			const workflowId = req.params.id;
+
+			if (!workflowId) {
+				throw new BadRequestError('Workflow ID is required');
+			}
+
+			const description = await this.marketplaceService.generateDescriptionPreview(
+				req.user,
+				workflowId,
+			);
+
+			return { description };
+		} catch (error) {
+			// Handle errors without circular references
+			throw new Error(`Error generating description preview: ${error.message}`);
 		}
 	}
 }

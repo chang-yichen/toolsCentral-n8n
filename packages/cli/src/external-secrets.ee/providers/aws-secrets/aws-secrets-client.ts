@@ -106,7 +106,7 @@ export class AwsSecretsClient {
 		const config: AxiosRequestConfig = {
 			method: 'POST',
 			url: this.settings.url,
-			headers,
+			headers: headers as any,
 			data: body,
 		};
 
@@ -141,7 +141,7 @@ export class AwsSecretsClient {
 		const config: AxiosRequestConfig = {
 			method: 'POST',
 			url: this.settings.url,
-			headers,
+			headers: headers as any,
 			data: body,
 		};
 

@@ -38,6 +38,7 @@ interface PublishData {
 	category: string;
 	workflowId: string;
 	isPublic?: boolean;
+	useAutoDescription?: boolean;
 }
 
 const BASE_ENDPOINT = '/marketplace';
@@ -87,6 +88,7 @@ export async function publishToMarketplace(
 		description: data.description,
 		category: data.category,
 		isPublic: data.isPublic,
+		useAutoDescription: data.useAutoDescription,
 	};
 
 	const response = await makeRestApiRequest<WorkflowResponse>(
@@ -130,5 +132,27 @@ export async function importMarketplaceWorkflow(
 
 		// Re-throw the error with additional context
 		throw error;
+	}
+}
+
+// Function to get a preview of the auto-generated description
+export async function getAutoDescriptionPreview(
+	context: IRestApiContext,
+	workflowId: string,
+): Promise<string> {
+	if (!workflowId) {
+		throw new Error('Workflow ID is required to generate description preview');
+	}
+
+	try {
+		const response = await makeRestApiRequest<{ description: string }>(
+			context,
+			'GET',
+			`${BASE_ENDPOINT}/preview-description/${workflowId}`,
+		);
+		return response.description;
+	} catch (error) {
+		console.error('Error getting description preview:', error);
+		throw new Error(`Failed to generate description preview: ${error.message || 'Unknown error'}`);
 	}
 }

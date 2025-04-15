@@ -86,8 +86,58 @@
 							v-model="publishForm.description"
 							type="textarea"
 							placeholder="Enter description"
-							required
+							:required="!publishForm.useAutoDescription"
+							:disabled="publishForm.useAutoDescription"
 						/>
+					</div>
+					<div class="form-group checkbox">
+						<n8n-checkbox
+							v-model="publishForm.useAutoDescription"
+							@change="handleAutoDescriptionChange"
+						>
+							Generate description automatically (max 30 words)
+						</n8n-checkbox>
+						<small
+							v-if="
+								publishForm.useAutoDescription &&
+								!publishForm.previewDescription &&
+								!loadingPreview &&
+								!previewError
+							"
+							class="help-text"
+						>
+							We'll analyze your workflow and create a concise description automatically.
+						</small>
+						<div
+							v-if="
+								publishForm.useAutoDescription &&
+								(publishForm.previewDescription || loadingPreview || previewError)
+							"
+							class="preview-description"
+						>
+							<div class="preview-header">
+								<span>Preview:</span>
+								<n8n-button
+									v-if="!loadingPreview"
+									size="small"
+									type="tertiary"
+									@click="generateDescriptionPreview"
+								>
+									Refresh
+								</n8n-button>
+							</div>
+							<div class="preview-content">
+								<n8n-loading v-if="loadingPreview" :loading="loadingPreview" :rows="2" />
+								<div v-else-if="previewError" class="preview-error">
+									<p>{{ previewError }}</p>
+									<small
+										>You can still continue with this auto-generated description or turn off
+										auto-description and write your own.</small
+									>
+								</div>
+								<p v-else>{{ publishForm.previewDescription }}</p>
+							</div>
+						</div>
 					</div>
 					<div class="form-group">
 						<label for="category">Category</label>
@@ -138,7 +188,9 @@
 						<h3>{{ workflow.name }}</h3>
 						<div class="category-tag">{{ workflow.category }}</div>
 					</div>
-					<p class="card-description">{{ workflow.description }}</p>
+					<p class="card-description" :title="workflow.description">
+						{{ truncateDescription(workflow.description) }}
+					</p>
 					<div class="card-footer">
 						<div class="author">
 							<n8n-avatar :first-name="workflow.author" size="small" />
@@ -167,7 +219,10 @@
 					<button class="close-button" @click="selectedWorkflow = null">×</button>
 				</div>
 				<div class="modal-content">
-					<p class="description">{{ selectedWorkflow.description }}</p>
+					<div class="description-section">
+						<h3>Description</h3>
+						<p class="description">{{ selectedWorkflow.description }}</p>
+					</div>
 
 					<div class="details-meta">
 						<div class="meta-item">
@@ -214,6 +269,7 @@ import {
 	publishToMarketplace,
 	getUserWorkflows,
 	importMarketplaceWorkflow,
+	getAutoDescriptionPreview,
 } from '@/api/marketplace';
 
 export default {
@@ -234,6 +290,8 @@ export default {
 		const showPublishForm = ref(false);
 		const publishing = ref(false);
 		const loadingUserWorkflows = ref(false);
+		const loadingPreview = ref(false);
+		const previewError = ref('');
 		const selectedWorkflowId = ref(null);
 		const selectedWorkflow = ref(null);
 		const searchTerm = ref('');
@@ -245,6 +303,8 @@ export default {
 			workflowId: '',
 			category: 'automation',
 			isPublic: true,
+			useAutoDescription: false,
+			previewDescription: '',
 		});
 
 		const fetchWorkflows = async () => {
@@ -323,17 +383,32 @@ export default {
 				if (workflow) {
 					publishForm.value.name = workflow.name;
 					publishForm.value.workflowId = workflow.id;
+
+					// If auto-description is enabled, generate a preview
+					if (publishForm.value.useAutoDescription) {
+						generateDescriptionPreview();
+					}
 				}
 			}
 		};
 
 		const publishWorkflow = async () => {
-			if (!publishForm.value.name || !publishForm.value.description || !selectedWorkflowId.value) {
+			if (
+				!publishForm.value.name ||
+				(!publishForm.value.description && !publishForm.value.useAutoDescription) ||
+				!selectedWorkflowId.value
+			) {
 				alert('Please fill in all required fields and select a workflow');
 				return;
 			}
 
 			publishForm.value.workflowId = selectedWorkflowId.value;
+
+			// If using auto-description and we have a preview, use it
+			if (publishForm.value.useAutoDescription && publishForm.value.previewDescription) {
+				publishForm.value.description = publishForm.value.previewDescription;
+			}
+
 			publishing.value = true;
 			try {
 				const result = await publishToMarketplace(restApiContext.value, publishForm.value);
@@ -345,6 +420,8 @@ export default {
 					workflowId: '',
 					category: 'automation',
 					isPublic: true,
+					useAutoDescription: false,
+					previewDescription: '',
 				};
 				selectedWorkflowId.value = null;
 
@@ -409,7 +486,66 @@ export default {
 		const formatDate = (dateString) => {
 			if (!dateString) return '';
 			const date = new Date(dateString);
-			return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+			return new Intl.DateTimeFormat('en-US', {
+				year: 'numeric',
+				month: 'short',
+				day: 'numeric',
+			}).format(date);
+		};
+
+		const truncateDescription = (description) => {
+			if (!description) return '';
+			return description.length > 100 ? description.substring(0, 100) + '...' : description;
+		};
+
+		const handleAutoDescriptionChange = () => {
+			if (publishForm.value.useAutoDescription) {
+				// Save current description in case user toggles back
+				publishForm.value._savedDescription = publishForm.value.description;
+				publishForm.value.description = '';
+				previewError.value = ''; // Clear any previous errors
+
+				// Generate a preview if a workflow is selected
+				if (selectedWorkflowId.value) {
+					generateDescriptionPreview();
+				}
+			} else if (publishForm.value._savedDescription) {
+				// Restore saved description if it exists
+				publishForm.value.description = publishForm.value._savedDescription;
+				delete publishForm.value._savedDescription;
+				publishForm.value.previewDescription = '';
+				previewError.value = '';
+			}
+		};
+
+		const generateDescriptionPreview = async () => {
+			if (!selectedWorkflowId.value) {
+				alert('Please select a workflow first');
+				return;
+			}
+
+			loadingPreview.value = true;
+			previewError.value = '';
+
+			try {
+				const preview = await getAutoDescriptionPreview(
+					restApiContext.value,
+					selectedWorkflowId.value,
+				);
+				publishForm.value.previewDescription = preview;
+				// If the preview looks like a fallback (it contains node count), show a warning
+				if (preview.includes('nodes total)')) {
+					previewError.value = 'Using simplified description due to AI service unavailability.';
+				}
+			} catch (err) {
+				console.error('Error generating description preview:', err);
+				previewError.value = err.message || 'Failed to generate description preview';
+
+				// Generate a basic description as fallback
+				publishForm.value.previewDescription = `Workflow "${publishForm.value.name}" - select to see more details`;
+			} finally {
+				loadingPreview.value = false;
+			}
 		};
 
 		onMounted(() => {
@@ -434,6 +570,8 @@ export default {
 			showPublishForm,
 			publishing,
 			loadingUserWorkflows,
+			loadingPreview,
+			previewError,
 			selectedWorkflowId,
 			selectedWorkflow,
 			publishForm,
@@ -449,6 +587,9 @@ export default {
 			viewWorkflowDetails,
 			importWorkflow,
 			formatDate,
+			truncateDescription,
+			handleAutoDescriptionChange,
+			generateDescriptionPreview,
 		};
 	},
 };
@@ -695,10 +836,22 @@ export default {
 		.modal-content {
 			padding: 1.5em;
 
-			.description {
-				margin-bottom: 1.5em;
-				line-height: 1.6;
-				color: var(--color-text-base);
+			.description-section {
+				margin-bottom: 2em;
+
+				h3 {
+					margin-top: 0;
+					margin-bottom: 0.5em;
+					font-size: 16px;
+					color: var(--color-text-dark);
+				}
+
+				.description {
+					margin-bottom: 0;
+					line-height: 1.6;
+					color: var(--color-text-base);
+					white-space: pre-line;
+				}
 			}
 
 			.details-meta {
@@ -755,6 +908,59 @@ export default {
 				margin-top: 2em;
 			}
 		}
+	}
+
+	.preview-description {
+		margin-top: 0.5em;
+		padding: 0.8em;
+		background-color: var(--color-background-light);
+		border-radius: 4px;
+		border: 1px solid var(--color-foreground-base);
+
+		.preview-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 0.5em;
+			font-weight: bold;
+			font-size: 12px;
+			color: var(--color-text-base);
+		}
+
+		.preview-content {
+			min-height: 60px;
+
+			p {
+				margin: 0;
+				font-size: 14px;
+				color: var(--color-text-dark);
+				line-height: 1.5;
+			}
+
+			.preview-error {
+				padding: 0.5em;
+				background-color: var(--color-warning-tint-2);
+				border-radius: 3px;
+
+				p {
+					color: var(--color-warning);
+					font-weight: 600;
+					margin-bottom: 0.5em;
+				}
+
+				small {
+					color: var(--color-text-dark);
+					font-size: 12px;
+				}
+			}
+		}
+	}
+
+	.help-text {
+		display: block;
+		margin-top: 0.5em;
+		font-size: 12px;
+		color: var(--color-text-light);
 	}
 }
 </style>
