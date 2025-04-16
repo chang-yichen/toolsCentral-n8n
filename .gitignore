@@ -22,6 +22,3 @@ packages/**/.turbo
 CHANGELOG-*.md
 *.mdx
 build-storybook.log
-
-# Exclude file with sensitive AWS credentials
-packages/cli/src/config/anthropic.config.ts

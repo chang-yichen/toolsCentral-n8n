@@ -12,24 +12,71 @@ export class LlmDescriptionService {
 
 	constructor(logger: Logger) {
 		this.logger = logger;
+
+		// Log config for debugging
+		this.logger.info('LlmDescriptionService initializing with Anthropic config:', {
+			enabled: ANTHROPIC_CONFIG.enabled,
+			region: ANTHROPIC_CONFIG.awsRegion,
+			model: ANTHROPIC_CONFIG.model,
+			// Don't log credentials, but log if they're provided
+			hasAwsAccessKey: !!ANTHROPIC_CONFIG.awsAccessKeyId,
+			hasAwsSecretKey: !!ANTHROPIC_CONFIG.awsSecretAccessKey,
+		});
+
 		this.initializeBedrockClient();
-		// Test the connection right away
-		this.testBedrockConnection();
+		// Test the connection right away if initialized
+		if (this.initialized) {
+			this.testBedrockConnection();
+		}
 	}
 
 	private initializeBedrockClient() {
 		try {
 			// Skip initialization if disabled
 			if (!ANTHROPIC_CONFIG.enabled) {
-				this.logger.debug('AWS Bedrock integration is disabled via configuration');
+				this.logger.info(
+					'AWS Bedrock integration is disabled via configuration (ANTHROPIC_ENABLED is not set to true)',
+				);
 				return;
 			}
 
-			this.logger.debug('Initializing AWS Bedrock client with config:', {
+			// Check if AWS credentials are provided
+			if (!ANTHROPIC_CONFIG.awsAccessKeyId) {
+				this.logger.error(
+					'AWS access key is missing. Please set ANTHROPIC_AWS_ACCESS_KEY_ID in your .env file.',
+				);
+				return;
+			}
+
+			if (!ANTHROPIC_CONFIG.awsSecretAccessKey) {
+				this.logger.error(
+					'AWS secret key is missing. Please set ANTHROPIC_AWS_SECRET_ACCESS_KEY in your .env file.',
+				);
+				return;
+			}
+
+			if (!ANTHROPIC_CONFIG.awsRegion) {
+				this.logger.error(
+					'AWS region is not specified. Please set ANTHROPIC_AWS_REGION in your .env file.',
+				);
+				return;
+			}
+
+			if (!ANTHROPIC_CONFIG.model) {
+				this.logger.error(
+					'Anthropic model is not specified. Please set ANTHROPIC_MODEL in your .env file.',
+				);
+				return;
+			}
+
+			this.logger.info('Initializing AWS Bedrock client with config:', {
 				enabled: ANTHROPIC_CONFIG.enabled,
 				region: ANTHROPIC_CONFIG.awsRegion,
-				accessKeyIdPrefix: ANTHROPIC_CONFIG.awsAccessKeyId.substring(0, 8) + '...',
 				model: ANTHROPIC_CONFIG.model,
+				// Mask most of the access key ID for security
+				accessKeyIdPrefix: ANTHROPIC_CONFIG.awsAccessKeyId
+					? ANTHROPIC_CONFIG.awsAccessKeyId.substring(0, 4) + '...'
+					: 'missing',
 			});
 
 			// Initialize the AWS Bedrock client
@@ -42,9 +89,13 @@ export class LlmDescriptionService {
 			});
 
 			this.initialized = true;
-			this.logger.debug('AWS Bedrock client initialized successfully');
+			this.logger.info('AWS Bedrock client initialized successfully');
 		} catch (error) {
-			this.logger.error('Failed to initialize AWS Bedrock client', { error });
+			this.logger.error('Failed to initialize AWS Bedrock client', {
+				error,
+				message: error.message,
+				stack: error.stack,
+			});
 			this.initialized = false;
 		}
 	}
@@ -56,7 +107,7 @@ export class LlmDescriptionService {
 				return;
 			}
 
-			this.logger.debug('Testing AWS Bedrock connection...');
+			this.logger.info('Testing AWS Bedrock connection...');
 
 			// Simple test prompt
 			const testRequest = {
@@ -81,11 +132,16 @@ export class LlmDescriptionService {
 			const responseText = new TextDecoder().decode(response.body);
 			const responseJson = JSON.parse(responseText);
 
-			this.logger.debug('AWS Bedrock connection test successful:', {
+			this.logger.info('AWS Bedrock connection test successful:', {
 				response: responseJson.content[0].text.trim(),
 			});
 		} catch (error) {
-			this.logger.error('AWS Bedrock connection test failed:', { error });
+			this.logger.error('AWS Bedrock connection test failed:', {
+				error,
+				message: error.message,
+				code: error.code,
+				stack: error.stack?.split('\n').slice(0, 3).join('\n'),
+			});
 		}
 	}
 
@@ -103,6 +159,10 @@ export class LlmDescriptionService {
 				initialized: this.initialized,
 				clientExists: !!this.bedrockClient,
 				enabled: ANTHROPIC_CONFIG.enabled,
+				hasAwsAccessKey: !!ANTHROPIC_CONFIG.awsAccessKeyId,
+				hasAwsSecretKey: !!ANTHROPIC_CONFIG.awsSecretAccessKey,
+				region: ANTHROPIC_CONFIG.awsRegion,
+				model: ANTHROPIC_CONFIG.model,
 			});
 			return this.generateFallbackDescription(workflow);
 		}
