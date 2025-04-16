@@ -179,3 +179,25 @@ export async function getAutoDescriptionPreview(
 		throw new Error(`Failed to generate description preview: ${error.message || 'Unknown error'}`);
 	}
 }
+
+// Function to delete a workflow from marketplace (admin or author only)
+export async function deleteMarketplaceWorkflow(
+	context: IRestApiContext,
+	workflowId: string,
+): Promise<{ success: boolean }> {
+	if (!workflowId) {
+		throw new Error('Workflow ID is required to delete workflow');
+	}
+
+	try {
+		const response = await makeRestApiRequest<{ success: boolean }>(
+			context,
+			'DELETE',
+			`${BASE_ENDPOINT}/${workflowId}`,
+		);
+		return response;
+	} catch (error) {
+		console.error('Error deleting marketplace workflow:', error);
+		throw new Error(`Failed to delete workflow: ${error.message || 'Unknown error'}`);
+	}
+}

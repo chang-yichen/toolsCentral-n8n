@@ -268,6 +268,16 @@
 								<n8n-icon icon="plus" />
 							</template>
 						</n8n-button>
+						<n8n-button
+							v-if="isAdmin"
+							label="Delete Workflow"
+							type="danger"
+							@click.stop="deleteWorkflow(selectedWorkflow)"
+						>
+							<template #icon>
+								<n8n-icon icon="trash" />
+							</template>
+						</n8n-button>
 					</div>
 				</div>
 			</div>
@@ -279,12 +289,14 @@
 import { ref, onMounted, computed, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useRootStore } from '@/stores/root.store';
+import { useUsersStore } from '@/stores/users.store';
 import {
 	getMarketplaceWorkflows,
 	publishToMarketplace,
 	getUserWorkflows,
 	importMarketplaceWorkflow,
 	getAutoDescriptionPreview,
+	deleteMarketplaceWorkflow,
 } from '@/api/marketplace';
 
 export default {
@@ -294,6 +306,7 @@ export default {
 		const route = useRoute();
 		const router = useRouter();
 		const rootStore = useRootStore();
+		const usersStore = useUsersStore();
 		const restApiContext = computed(() => rootStore.restApiContext);
 
 		const marketplaceWorkflows = ref([]);
@@ -322,6 +335,12 @@ export default {
 			previewDescription: '',
 		});
 		let refreshInterval = null;
+
+		// Check if current user is an admin
+		const isAdmin = computed(() => {
+			const user = usersStore.currentUser;
+			return user?.role === 'global:admin' || user?.role === 'global:owner';
+		});
 
 		const fetchWorkflows = async () => {
 			console.log('Fetching marketplace workflows...');
@@ -638,6 +657,37 @@ export default {
 			}
 		};
 
+		const deleteWorkflow = async (workflowToDelete) => {
+			if (!workflowToDelete || !workflowToDelete.id) {
+				alert('Invalid workflow selected for deletion');
+				return;
+			}
+
+			const confirmDelete = confirm(
+				`Are you sure you want to delete the workflow "${workflowToDelete.name}" from the marketplace? This action cannot be undone.`,
+			);
+
+			if (!confirmDelete) return;
+
+			try {
+				await deleteMarketplaceWorkflow(restApiContext.value, workflowToDelete.id);
+				alert(`Workflow "${workflowToDelete.name}" has been deleted from the marketplace.`);
+
+				// Remove the workflow from the lists
+				marketplaceWorkflows.value = marketplaceWorkflows.value.filter(
+					(wf) => wf.id !== workflowToDelete.id,
+				);
+				filteredWorkflows.value = filteredWorkflows.value.filter(
+					(wf) => wf.id !== workflowToDelete.id,
+				);
+
+				selectedWorkflow.value = null; // Close the modal
+			} catch (err) {
+				console.error('Error deleting workflow:', err);
+				alert('Failed to delete workflow: ' + (err.message || 'Unknown error'));
+			}
+		};
+
 		onMounted(() => {
 			fetchWorkflows();
 			startRefreshInterval();
@@ -674,6 +724,7 @@ export default {
 			searchTerm,
 			selectedCategory,
 			sortBy,
+			isAdmin,
 			fetchWorkflows,
 			filterWorkflows,
 			resetFilters,
@@ -682,6 +733,7 @@ export default {
 			publishWorkflow,
 			viewWorkflowDetails,
 			importWorkflow,
+			deleteWorkflow,
 			formatDate,
 			truncateDescription,
 			handleAutoDescriptionChange,

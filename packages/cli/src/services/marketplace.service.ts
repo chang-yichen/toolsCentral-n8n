@@ -418,4 +418,47 @@ export class MarketplaceService {
 			return 'Error generating description. Please provide one manually.';
 		}
 	}
+
+	/**
+	 * Delete a workflow from the marketplace
+	 * Only admins or the original author can delete a workflow
+	 */
+	async delete(user: User, workflowId: string): Promise<boolean> {
+		try {
+			// Find the marketplace workflow
+			const marketplaceWorkflow = await this.marketplaceWorkflowRepository.findOne({
+				where: { id: workflowId },
+			});
+
+			if (!marketplaceWorkflow) {
+				throw new NotFoundError('Marketplace workflow not found');
+			}
+
+			// Check if user is authorized to delete (must be admin or the original author)
+			const isAdmin = user.role === 'global:admin' || user.role === 'global:owner';
+			const isAuthor = marketplaceWorkflow.authorId === user.id;
+
+			if (!isAdmin && !isAuthor) {
+				throw new ForbiddenError('You do not have permission to delete this workflow');
+			}
+
+			// Delete the workflow
+			await this.marketplaceWorkflowRepository.delete(workflowId);
+
+			this.logger.info(`Workflow ${workflowId} deleted from marketplace`, {
+				userId: user.id,
+				workflowId,
+				isAdmin,
+				isAuthor,
+			});
+
+			return true;
+		} catch (error) {
+			this.logger.error(`Error deleting marketplace workflow ${workflowId}: ${error.message}`, {
+				userId: user.id,
+				workflowId,
+			});
+			throw error;
+		}
+	}
 }

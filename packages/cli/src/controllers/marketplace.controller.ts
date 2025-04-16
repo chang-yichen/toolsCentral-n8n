@@ -1,8 +1,10 @@
-import { Get, Post, RestController, Param } from '@/decorators';
+import { Get, Post, RestController, Param, Delete } from '@/decorators';
 import { MarketplaceService } from '@/services/marketplace.service'; // Use alias path
 import type { Request as ExpressRequest } from 'express'; // Use Express types if applicable
 import type { User } from '../databases/entities/user'; // Assuming User entity path
 import { BadRequestError } from '../errors/response-errors/bad-request.error';
+import { ForbiddenError } from '../errors/response-errors/forbidden.error';
+import { NotFoundError } from '../errors/response-errors/not-found.error';
 import type { MarketplaceWorkflowEntity } from '../databases/entities/marketplace-workflow-entity';
 
 interface AuthenticatedRequest extends ExpressRequest {
@@ -201,6 +203,27 @@ export class MarketplaceController {
 		} catch (error) {
 			// Handle errors without circular references
 			throw new Error(`Error generating description preview: ${error.message}`);
+		}
+	}
+
+	// Endpoint to delete a workflow from marketplace (admin or author only)
+	@Delete('/:id')
+	async deleteWorkflow(req: AuthenticatedRequest) {
+		try {
+			const workflowId = req.params.id;
+
+			if (!workflowId) {
+				throw new BadRequestError('Workflow ID is required');
+			}
+
+			const result = await this.marketplaceService.delete(req.user, workflowId);
+			return { success: result };
+		} catch (error) {
+			if (error instanceof ForbiddenError || error instanceof NotFoundError) {
+				throw error;
+			}
+			// Handle other errors
+			throw new Error(`Error deleting workflow: ${error.message}`);
 		}
 	}
 }
