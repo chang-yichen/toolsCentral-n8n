@@ -12,6 +12,7 @@ interface WorkflowResponse {
 	downloads: number;
 	isPublic: boolean;
 	authorName: string;
+	authorId: string;
 }
 
 // Frontend interface for marketplace workflows
@@ -24,6 +25,7 @@ interface MarketplaceWorkflow {
 	updatedAt: string;
 	downloads: number;
 	author: string;
+	authorId: string;
 	isPublic: boolean;
 }
 
@@ -48,6 +50,7 @@ const BASE_ENDPOINT = '/marketplace';
 function transformToFrontendFormat(workflow: WorkflowResponse): MarketplaceWorkflow {
 	// Add debugging to help diagnose description issues
 	console.log('Processing workflow:', workflow.name, 'Description:', workflow.description);
+	console.log('Backend authorId:', workflow.authorId);
 
 	// Clean up and normalize the description
 	let description = 'No description available';
@@ -55,7 +58,7 @@ function transformToFrontendFormat(workflow: WorkflowResponse): MarketplaceWorkf
 		description = workflow.description.trim();
 	}
 
-	return {
+	const transformedWorkflow = {
 		id: workflow.id,
 		name: workflow.name,
 		description: description,
@@ -64,8 +67,12 @@ function transformToFrontendFormat(workflow: WorkflowResponse): MarketplaceWorkf
 		updatedAt: workflow.updatedAt,
 		downloads: workflow.downloads || 0,
 		author: workflow.authorName || 'n8n community',
+		authorId: workflow.authorId,
 		isPublic: workflow.isPublic,
 	};
+
+	console.log('Transformed workflow with authorId:', transformedWorkflow.authorId);
+	return transformedWorkflow;
 }
 
 // Function to get marketplace workflows

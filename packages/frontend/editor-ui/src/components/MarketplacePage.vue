@@ -269,10 +269,11 @@
 							</template>
 						</n8n-button>
 						<n8n-button
-							v-if="isAdmin"
+							v-if="isAdmin || isAuthorOfSelectedWorkflow"
 							label="Delete Workflow"
 							type="danger"
 							@click.stop="deleteWorkflow(selectedWorkflow)"
+							class="delete-button"
 						>
 							<template #icon>
 								<n8n-icon icon="trash" />
@@ -338,8 +339,25 @@ export default {
 
 		// Check if current user is an admin
 		const isAdmin = computed(() => {
-			const user = usersStore.currentUser;
-			return user?.role === 'global:admin' || user?.role === 'global:owner';
+			const user = usersStore?.currentUser;
+			return user && (user.role === 'global:admin' || user.role === 'global:owner');
+		});
+
+		// Add a computed property for checking if user is author
+		const isAuthorOfSelectedWorkflow = computed(() => {
+			if (!selectedWorkflow.value || !usersStore?.currentUser) return false;
+
+			console.log('Comparing workflowId:', selectedWorkflow.value.id);
+			console.log('Workflow authorId:', selectedWorkflow.value.authorId);
+			console.log('Current user ID:', usersStore.currentUser.id);
+
+			// Check the string representation to account for type mismatches
+			const authorIdStr = String(selectedWorkflow.value.authorId);
+			const userIdStr = String(usersStore.currentUser.id);
+
+			console.log('String comparison:', authorIdStr === userIdStr);
+
+			return authorIdStr === userIdStr;
 		});
 
 		const fetchWorkflows = async () => {
@@ -531,7 +549,10 @@ export default {
 
 		const viewWorkflowDetails = (workflow) => {
 			console.log('Opening workflow details:', workflow);
-			console.log('Description:', workflow.description);
+			console.log('Workflow authorId:', workflow.authorId);
+			console.log('Current user ID:', usersStore?.currentUser?.id);
+			console.log('Is owner check:', workflow.authorId === usersStore?.currentUser?.id);
+			console.log('Is admin check:', isAdmin.value);
 			selectedWorkflow.value = { ...workflow }; // Create a fresh copy to ensure reactivity
 		};
 
@@ -725,6 +746,7 @@ export default {
 			selectedCategory,
 			sortBy,
 			isAdmin,
+			isAuthorOfSelectedWorkflow,
 			fetchWorkflows,
 			filterWorkflows,
 			resetFilters,
@@ -1028,6 +1050,7 @@ export default {
 				display: flex;
 				justify-content: center;
 				margin-top: 1.5em;
+				gap: 15px;
 			}
 		}
 	}

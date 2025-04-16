@@ -31,6 +31,7 @@ interface WorkflowResponse {
 	downloads?: number;
 	isPublic?: boolean;
 	authorName?: string;
+	authorId?: string;
 	createdAt?: Date;
 	updatedAt?: Date;
 }
@@ -50,6 +51,7 @@ export class MarketplaceController {
 			downloads: workflow.downloads,
 			isPublic: workflow.isPublic,
 			authorName: workflow.authorName,
+			authorId: workflow.authorId,
 			createdAt: workflow.createdAt,
 			updatedAt: workflow.updatedAt,
 		};
