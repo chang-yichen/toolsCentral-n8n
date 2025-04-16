@@ -1,8 +1,9 @@
 import { Get, Post, RestController, Param } from '@/decorators';
-import { MarketplaceService } from '@/services/marketplace.service'; // Use alias path// Assume Request types exist or define basic ones
+import { MarketplaceService } from '@/services/marketplace.service'; // Use alias path
 import type { Request as ExpressRequest } from 'express'; // Use Express types if applicable
 import type { User } from '../databases/entities/user'; // Assuming User entity path
 import { BadRequestError } from '../errors/response-errors/bad-request.error';
+import type { MarketplaceWorkflowEntity } from '../databases/entities/marketplace-workflow-entity';
 
 interface AuthenticatedRequest extends ExpressRequest {
 	user: User; // Use the actual User type
@@ -27,6 +28,7 @@ interface WorkflowResponse {
 	category?: string;
 	downloads?: number;
 	isPublic?: boolean;
+	authorName?: string;
 	createdAt?: Date;
 	updatedAt?: Date;
 }
@@ -35,16 +37,17 @@ interface WorkflowResponse {
 export class MarketplaceController {
 	constructor(private readonly marketplaceService: MarketplaceService) {}
 
-	// Helper to convert workflow entity to safe serializable object
-	private toWorkflowResponse(workflow: any): WorkflowResponse {
+	// Helper to convert marketplace workflow entity to safe serializable object
+	private toWorkflowResponse(workflow: MarketplaceWorkflowEntity): WorkflowResponse {
 		// Extract only the fields we need to avoid circular references
 		return {
 			id: workflow.id,
 			name: workflow.name,
-			description: workflow.marketplaceDescription,
-			category: workflow.marketplaceCategory,
-			downloads: workflow.marketplaceDownloads,
-			isPublic: workflow.marketplaceIsPublic,
+			description: workflow.description,
+			category: workflow.category,
+			downloads: workflow.downloads,
+			isPublic: workflow.isPublic,
+			authorName: workflow.authorName,
 			createdAt: workflow.createdAt,
 			updatedAt: workflow.updatedAt,
 		};
@@ -122,8 +125,14 @@ export class MarketplaceController {
 			// Pass the validated ID string to the service
 			const workflow = await this.marketplaceService.import(req.user, workflowId);
 
-			// Return only serializable data
-			return this.toWorkflowResponse(workflow);
+			// Return only serializable data about the imported workflow
+			return {
+				id: workflow.id,
+				name: workflow.name,
+				active: workflow.active,
+				createdAt: workflow.createdAt,
+				updatedAt: workflow.updatedAt,
+			};
 		} catch (error) {
 			// Log the error with more details
 			console.error(`Workflow import error: ${error.message}`, {
@@ -154,8 +163,6 @@ export class MarketplaceController {
 	}
 
 	// Endpoint to get user's own workflows (for the publish dropdown)
-	// Note: This might logically belong in a different controller (e.g., WorkflowsController)
-	// but placing it here for simplicity for now.
 	@Get('/user-workflows')
 	async getUserWorkflows(req: AuthenticatedRequest) {
 		try {

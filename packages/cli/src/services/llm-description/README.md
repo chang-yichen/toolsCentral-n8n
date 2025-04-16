@@ -1,50 +1,54 @@
 # Automatic Workflow Description Generation
 
-This feature enables automatic generation of concise workflow descriptions (max 30 words) when publishing workflows to the marketplace. It uses the Anthropic Claude LLM model through AWS Bedrock to analyze the workflow structure and generate a human-readable description.
+This feature uses AWS Bedrock with Claude models to automatically generate concise descriptions for your workflows when publishing them to the marketplace.
 
 ## Setup
 
-1. Install the required dependency:
-   ```
-   pnpm add @aws-sdk/client-bedrock-runtime --filter "*cli*"
-   ```
+To enable the automatic description generation, you need to set the following environment variables:
 
-2. Configure the AWS Bedrock integration by setting these environment variables:
+```
+ANTHROPIC_ENABLED=true
+ANTHROPIC_AWS_ACCESS_KEY_ID=your_aws_access_key
+ANTHROPIC_AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+ANTHROPIC_AWS_REGION=your_aws_region
+```
 
-   ```
-   # Enable the integration
-   ANTHROPIC_ENABLED=true
-   
-   # AWS credentials for Bedrock
-   ANTHROPIC_AWS_ACCESS_KEY_ID=your_aws_access_key
-   ANTHROPIC_AWS_SECRET_ACCESS_KEY=your_aws_secret_key
-   ANTHROPIC_AWS_REGION=us-east-1  # or your preferred region
-   
-   # Optional: Override the model
-   ANTHROPIC_MODEL=anthropic.claude-3-sonnet-20240229-v1:0
-   ```
-
-   You can also use standard AWS credential environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`) or AWS credential providers (like `~/.aws/credentials`).
+You can optionally set the following variables:
+```
+ANTHROPIC_MODEL=anthropic.claude-3-5-sonnet-20240620-v1:0  # Default model
+ANTHROPIC_TEMP_DIR=/tmp  # Temp directory for processing
+```
 
 ## How It Works
 
-1. When publishing a workflow to the marketplace, users can check the "Generate description automatically" option.
-2. The system will send the workflow structure (nodes, connections, etc.) to the Anthropic Claude model via AWS Bedrock.
-3. The LLM analyzes the workflow and generates a concise description (max 30 words).
-4. The generated description is saved as the workflow's marketplace description.
+When publishing a workflow to the marketplace, you can enable the automatic description option, which will:
+
+1. Process your workflow structure and extract key information
+2. Send it to Claude via AWS Bedrock to generate a concise, meaningful description
+3. Use the generated description instead of a manually entered one
+
+## Fallback Behavior
+
+If AWS Bedrock is unavailable or returns an error, the system will generate a basic description based on the workflow's nodes and structure. This ensures you always get a description even if the LLM service is unavailable.
+
+## Privacy & Security
+
+- Your workflow structure is sent to AWS Bedrock for processing
+- No sensitive data such as credentials or connection details are sent
+- Only basic node information and workflow structure are used for description generation
+- AWS IAM permissions should be limited to Bedrock model invocation only
 
 ## Troubleshooting
 
-If auto-description generation is not working:
+If you experience issues with description generation:
 
-1. Check the logs for any errors from the LlmDescriptionService.
-2. Verify that `ANTHROPIC_ENABLED` is set to `true`.
-3. Ensure AWS credentials have the necessary permissions to access Claude models on AWS Bedrock.
-4. Make sure you have access to the specified Claude model in your AWS Bedrock service.
-5. Verify that the model ID is correct for your region and account.
+1. Check that your AWS credentials are correct and have the necessary permissions
+2. Verify the selected model is available in your AWS region
+3. Check the logs for specific error messages
+4. If all else fails, disable the feature and use manual descriptions
 
-## Security Considerations
+## Example Generated Descriptions
 
-- No sensitive workflow data is sent to external services. Only the workflow structure (not credentials or sensitive parameters) is sent to the LLM.
-- AWS credentials should have the minimum necessary permissions to access the Anthropic Claude model on Bedrock.
-- Consider using IAM roles and temporary credentials rather than long-lived access keys when possible. 
+- "Automatically posts new Slack messages to a Notion database with custom properties."
+- "Monitors Twitter for specific hashtags and sends daily email summaries of trending topics."
+- "Syncs customer data between HubSpot and Salesforce with customized field mapping." 

@@ -189,7 +189,11 @@
 						<div class="category-tag">{{ workflow.category }}</div>
 					</div>
 					<p class="card-description" :title="workflow.description">
-						{{ truncateDescription(workflow.description) }}
+						{{
+							workflow.description !== 'No description available'
+								? workflow.description
+								: 'No description available'
+						}}
 					</p>
 					<div class="card-footer">
 						<div class="author">
@@ -221,7 +225,18 @@
 				<div class="modal-content">
 					<div class="description-section">
 						<h3>Description</h3>
-						<p class="description">{{ selectedWorkflow.description }}</p>
+						<p
+							class="description"
+							v-if="
+								selectedWorkflow.description &&
+								selectedWorkflow.description !== 'No description available'
+							"
+						>
+							{{ selectedWorkflow.description }}
+						</p>
+						<p class="description description-empty" v-else>
+							No description available for this workflow.
+						</p>
 					</div>
 
 					<div class="details-meta">
@@ -261,7 +276,7 @@
 </template>
 
 <script>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useRootStore } from '@/stores/root.store';
 import {
@@ -306,14 +321,30 @@ export default {
 			useAutoDescription: false,
 			previewDescription: '',
 		});
+		let refreshInterval = null;
 
 		const fetchWorkflows = async () => {
+			console.log('Fetching marketplace workflows...');
 			loading.value = true;
 			error.value = null;
 			try {
-				marketplaceWorkflows.value = await getMarketplaceWorkflows(restApiContext.value);
-				filteredWorkflows.value = [...marketplaceWorkflows.value];
+				const workflows = await getMarketplaceWorkflows(restApiContext.value);
+				console.log('Retrieved workflows count:', workflows.length);
+				console.log('First workflow:', workflows[0]);
+
+				// Ensure we have the latest data
+				marketplaceWorkflows.value = workflows;
+
+				// Apply any active filters
+				if (searchTerm.value || selectedCategory.value) {
+					filterWorkflows();
+				} else {
+					// Reset filtered workflows to show all workflows
+					filteredWorkflows.value = [...marketplaceWorkflows.value];
+				}
+
 				workflowsLoaded.value = true;
+				console.log('Workflows loaded, filtered count:', filteredWorkflows.value.length);
 			} catch (err) {
 				console.error('Error in fetchWorkflows:', err);
 				error.value = err.message || 'Failed to load marketplace workflows. Please try again.';
@@ -323,6 +354,12 @@ export default {
 		};
 
 		const filterWorkflows = () => {
+			console.log('Filtering workflows...');
+			console.log('Search term:', searchTerm.value);
+			console.log('Selected category:', selectedCategory.value);
+			console.log('Sort by:', sortBy.value);
+			console.log('Total workflows to filter:', marketplaceWorkflows.value.length);
+
 			let filtered = [...marketplaceWorkflows.value];
 
 			// Filter by search term
@@ -334,11 +371,13 @@ export default {
 						wf.description.toLowerCase().includes(term) ||
 						wf.author.toLowerCase().includes(term),
 				);
+				console.log('After search filter, count:', filtered.length);
 			}
 
 			// Filter by category
 			if (selectedCategory.value) {
 				filtered = filtered.filter((wf) => wf.category === selectedCategory.value);
+				console.log('After category filter, count:', filtered.length);
 			}
 
 			// Sort results
@@ -354,7 +393,12 @@ export default {
 					break;
 			}
 
-			filteredWorkflows.value = filtered;
+			// Update the filtered workflows with a new array to ensure reactivity
+			filteredWorkflows.value = [...filtered];
+			console.log('Final filtered count:', filteredWorkflows.value.length);
+			if (filteredWorkflows.value.length > 0) {
+				console.log('First filtered workflow:', filteredWorkflows.value[0].name);
+			}
 		};
 
 		const resetFilters = () => {
@@ -403,6 +447,7 @@ export default {
 			}
 
 			publishForm.value.workflowId = selectedWorkflowId.value;
+			console.log('Publishing workflow:', publishForm.value);
 
 			// If using auto-description and we have a preview, use it
 			if (publishForm.value.useAutoDescription && publishForm.value.previewDescription) {
@@ -412,6 +457,7 @@ export default {
 			publishing.value = true;
 			try {
 				const result = await publishToMarketplace(restApiContext.value, publishForm.value);
+				console.log('Publish result:', result);
 				alert(`Successfully published "${result.name}" to the marketplace.`);
 				showPublishForm.value = false;
 				publishForm.value = {
@@ -426,14 +472,36 @@ export default {
 				selectedWorkflowId.value = null;
 
 				// Update both arrays
+				console.log(
+					'Before update - marketplaceWorkflows count:',
+					marketplaceWorkflows.value.length,
+				);
+				console.log('Before update - filteredWorkflows count:', filteredWorkflows.value.length);
+
+				// Make a new array instead of modifying the existing one to ensure reactivity
 				marketplaceWorkflows.value = [result, ...marketplaceWorkflows.value];
+				console.log(
+					'After adding - marketplaceWorkflows count:',
+					marketplaceWorkflows.value.length,
+				);
+
 				// Reset to original values and re-apply current filters
 				if (searchTerm.value || selectedCategory.value) {
+					console.log('Applying filters after publish');
 					filterWorkflows();
 				} else {
 					// If no filters, just copy the data
+					console.log('No filters, copying all data to filtered view');
 					filteredWorkflows.value = [...marketplaceWorkflows.value];
 				}
+
+				console.log('After update - filteredWorkflows count:', filteredWorkflows.value.length);
+				console.log('First workflow in filtered list:', filteredWorkflows.value[0]?.name);
+
+				// Force re-render the component
+				setTimeout(() => {
+					fetchWorkflows();
+				}, 500);
 			} catch (err) {
 				console.error('Error publishing workflow:', err);
 				alert('Failed to publish workflow: ' + (err.message || 'Unknown error'));
@@ -443,7 +511,9 @@ export default {
 		};
 
 		const viewWorkflowDetails = (workflow) => {
-			selectedWorkflow.value = workflow;
+			console.log('Opening workflow details:', workflow);
+			console.log('Description:', workflow.description);
+			selectedWorkflow.value = { ...workflow }; // Create a fresh copy to ensure reactivity
 		};
 
 		const importWorkflow = async (workflowToImport) => {
@@ -494,8 +564,8 @@ export default {
 		};
 
 		const truncateDescription = (description) => {
-			if (!description) return '';
-			return description.length > 100 ? description.substring(0, 100) + '...' : description;
+			if (!description || description.trim() === '') return 'No description available';
+			return description.length > 150 ? description.substring(0, 150) + '...' : description;
 		};
 
 		const handleAutoDescriptionChange = () => {
@@ -548,8 +618,29 @@ export default {
 			}
 		};
 
+		const startRefreshInterval = () => {
+			// Clear any existing interval
+			if (refreshInterval) {
+				clearInterval(refreshInterval);
+			}
+
+			// Set up a new refresh interval (every 30 seconds)
+			refreshInterval = setInterval(() => {
+				console.log('Auto-refreshing marketplace workflows...');
+				fetchWorkflows();
+			}, 30000); // 30 seconds
+		};
+
+		const stopRefreshInterval = () => {
+			if (refreshInterval) {
+				clearInterval(refreshInterval);
+				refreshInterval = null;
+			}
+		};
+
 		onMounted(() => {
 			fetchWorkflows();
+			startRefreshInterval();
 
 			const { publish, workflowId, workflowName } = route.query;
 			if (publish === 'true' && workflowId) {
@@ -558,6 +649,11 @@ export default {
 				publishForm.value.workflowId = workflowId;
 				openPublishForm();
 			}
+		});
+
+		// Clean up the interval when the component is unmounted
+		onUnmounted(() => {
+			stopRefreshInterval();
 		});
 
 		return {
@@ -590,6 +686,8 @@ export default {
 			truncateDescription,
 			handleAutoDescriptionChange,
 			generateDescriptionPreview,
+			startRefreshInterval,
+			stopRefreshInterval,
 		};
 	},
 };
@@ -753,8 +851,9 @@ export default {
 			line-height: 1.5;
 			overflow: hidden;
 			display: -webkit-box;
-			-webkit-line-clamp: 3;
+			-webkit-line-clamp: 4;
 			-webkit-box-orient: vertical;
+			min-height: 4.5em; /* Ensures consistent height even with short or no description */
 		}
 
 		.card-footer {

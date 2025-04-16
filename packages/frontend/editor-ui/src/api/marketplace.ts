@@ -1,16 +1,17 @@
 import type { IRestApiContext } from '@/Interface'; // Assuming context type path
 import { makeRestApiRequest } from '@/utils/apiUtils';
 
-// Backend response structure
+// Backend response structure - updated to match MarketplaceWorkflowEntity
 interface WorkflowResponse {
 	id: string;
 	name: string;
-	marketplaceDescription: string;
-	marketplaceCategory: string;
+	description: string;
+	category: string;
 	createdAt: string;
 	updatedAt: string;
-	marketplaceDownloads: number;
-	marketplaceIsPublic: boolean;
+	downloads: number;
+	isPublic: boolean;
+	authorName: string;
 }
 
 // Frontend interface for marketplace workflows
@@ -45,16 +46,25 @@ const BASE_ENDPOINT = '/marketplace';
 
 // Transform from backend to frontend format
 function transformToFrontendFormat(workflow: WorkflowResponse): MarketplaceWorkflow {
+	// Add debugging to help diagnose description issues
+	console.log('Processing workflow:', workflow.name, 'Description:', workflow.description);
+
+	// Clean up and normalize the description
+	let description = 'No description available';
+	if (workflow.description && workflow.description.trim() !== '') {
+		description = workflow.description.trim();
+	}
+
 	return {
 		id: workflow.id,
 		name: workflow.name,
-		description: workflow.marketplaceDescription || '',
-		category: workflow.marketplaceCategory || 'Other',
+		description: description,
+		category: workflow.category || 'Other',
 		createdAt: workflow.createdAt,
 		updatedAt: workflow.updatedAt,
-		downloads: workflow.marketplaceDownloads || 0,
-		author: 'n8n community',
-		isPublic: workflow.marketplaceIsPublic,
+		downloads: workflow.downloads || 0,
+		author: workflow.authorName || 'n8n community',
+		isPublic: workflow.isPublic,
 	};
 }
 
@@ -91,14 +101,27 @@ export async function publishToMarketplace(
 		useAutoDescription: data.useAutoDescription,
 	};
 
-	const response = await makeRestApiRequest<WorkflowResponse>(
-		context,
-		'POST',
-		`${BASE_ENDPOINT}/publish`,
-		transformedData,
-	);
+	console.log('Publishing to marketplace with data:', transformedData);
 
-	return transformToFrontendFormat(response);
+	try {
+		const response = await makeRestApiRequest<WorkflowResponse>(
+			context,
+			'POST',
+			`${BASE_ENDPOINT}/publish`,
+			transformedData,
+		);
+
+		console.log('Publish API response:', response);
+
+		// Transform the response to frontend format
+		const transformedWorkflow = transformToFrontendFormat(response);
+		console.log('Transformed workflow for frontend:', transformedWorkflow);
+
+		return transformedWorkflow;
+	} catch (error) {
+		console.error('Error in publishToMarketplace API call:', error);
+		throw error;
+	}
 }
 
 // Function to import a workflow (copy to user's workflows)
