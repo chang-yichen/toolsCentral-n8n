@@ -135,7 +135,7 @@ export async function publishToMarketplace(
 export async function importMarketplaceWorkflow(
 	context: IRestApiContext,
 	marketplaceWorkflowId: string,
-): Promise<UserWorkflow> {
+): Promise<{ workflow: UserWorkflow; marketplaceWorkflow: MarketplaceWorkflow }> {
 	// Validate input
 	if (!marketplaceWorkflowId || typeof marketplaceWorkflowId !== 'string') {
 		throw new Error('Invalid workflow ID provided');
@@ -145,13 +145,18 @@ export async function importMarketplaceWorkflow(
 	const cleanId = marketplaceWorkflowId.toString().trim();
 
 	try {
-		// Returns the newly created user workflow
+		// Returns the newly created user workflow and updated marketplace workflow
 		// POST /marketplace/import/:id
-		return await makeRestApiRequest<UserWorkflow>(
-			context,
-			'POST',
-			`${BASE_ENDPOINT}/import/${cleanId}`,
-		);
+		return await makeRestApiRequest<{
+			workflow: UserWorkflow;
+			marketplaceWorkflow: WorkflowResponse;
+		}>(context, 'POST', `${BASE_ENDPOINT}/import/${cleanId}`).then((response) => {
+			// Transform the marketplace workflow response to frontend format
+			return {
+				workflow: response.workflow,
+				marketplaceWorkflow: transformToFrontendFormat(response.marketplaceWorkflow),
+			};
+		});
 	} catch (error) {
 		console.error('Error importing workflow:', error);
 

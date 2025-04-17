@@ -127,15 +127,18 @@ export class MarketplaceController {
 			}
 
 			// Pass the validated ID string to the service
-			const workflow = await this.marketplaceService.import(req.user, workflowId);
+			const result = await this.marketplaceService.import(req.user, workflowId);
 
-			// Return only serializable data about the imported workflow
+			// Return both the imported workflow and the updated marketplace workflow
 			return {
-				id: workflow.id,
-				name: workflow.name,
-				active: workflow.active,
-				createdAt: workflow.createdAt,
-				updatedAt: workflow.updatedAt,
+				workflow: {
+					id: result.workflow.id,
+					name: result.workflow.name,
+					active: result.workflow.active,
+					createdAt: result.workflow.createdAt,
+					updatedAt: result.workflow.updatedAt,
+				},
+				marketplaceWorkflow: this.toWorkflowResponse(result.marketplaceWorkflow),
 			};
 		} catch (error) {
 			// Log the error with more details

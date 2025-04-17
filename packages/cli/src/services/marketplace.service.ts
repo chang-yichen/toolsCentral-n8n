@@ -160,7 +160,10 @@ export class MarketplaceService {
 	/**
 	 * Import a workflow from the marketplace
 	 */
-	async import(user: User, workflowId: string): Promise<WorkflowEntity> {
+	async import(
+		user: User,
+		workflowId: string,
+	): Promise<{ workflow: WorkflowEntity; marketplaceWorkflow: MarketplaceWorkflowEntity }> {
 		// Validate the input workflowId to ensure it's a valid string
 		if (!workflowId || typeof workflowId !== 'string') {
 			this.logger.error(`Invalid workflow ID provided for import: ${typeof workflowId}`, {
@@ -208,7 +211,7 @@ export class MarketplaceService {
 			const personalProject = await this.projectRepository.getPersonalProjectForUserOrFail(user.id);
 
 			// Handle within a transaction
-			const savedWorkflow = await this.workflowRepository.manager.transaction(
+			const savedResult = await this.workflowRepository.manager.transaction(
 				async (transactionManager) => {
 					// Save the new workflow
 					const savedWf = await transactionManager.save(newWorkflow);
@@ -228,16 +231,32 @@ export class MarketplaceService {
 						1,
 					);
 
-					// Return a clean workflow object
-					return await transactionManager.findOne(WorkflowEntity, {
+					// Get the clean workflow object
+					const cleanWorkflow = await transactionManager.findOne(WorkflowEntity, {
 						where: { id: savedWf.id },
 						select: ['id', 'name', 'active', 'createdAt', 'updatedAt'],
 					});
+
+					// Get the updated marketplace workflow
+					const updatedMarketplaceWorkflow = await transactionManager.findOne(
+						MarketplaceWorkflowEntity,
+						{
+							where: { id: workflowId },
+						},
+					);
+
+					return {
+						workflow: cleanWorkflow,
+						marketplaceWorkflow: updatedMarketplaceWorkflow,
+					};
 				},
 			);
 
-			// Return the successfully imported workflow
-			return savedWorkflow as WorkflowEntity;
+			// Return the successfully imported workflow and updated marketplace workflow
+			return {
+				workflow: savedResult.workflow as WorkflowEntity,
+				marketplaceWorkflow: savedResult.marketplaceWorkflow as MarketplaceWorkflowEntity,
+			};
 		} catch (error) {
 			// Log more detailed information about the error
 			this.logger.error(`Error importing workflow ${workflowId}: ${error.message}`, {

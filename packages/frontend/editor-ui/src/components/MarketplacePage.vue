@@ -566,12 +566,33 @@ export default {
 				// Log the workflow ID for debugging
 				console.log('Importing workflow with ID:', workflowToImport.id);
 
-				const importedWf = await importMarketplaceWorkflow(
-					restApiContext.value,
-					workflowToImport.id,
+				const response = await importMarketplaceWorkflow(restApiContext.value, workflowToImport.id);
+
+				// Update the download count in the UI without waiting for a refresh
+				const { workflow: importedWf, marketplaceWorkflow } = response;
+
+				// Update the selected workflow's download count
+				if (selectedWorkflow.value && selectedWorkflow.value.id === marketplaceWorkflow.id) {
+					selectedWorkflow.value.downloads = marketplaceWorkflow.downloads;
+				}
+
+				// Update the workflow in both arrays to reflect new download count
+				marketplaceWorkflows.value = marketplaceWorkflows.value.map((wf) =>
+					wf.id === marketplaceWorkflow.id
+						? { ...wf, downloads: marketplaceWorkflow.downloads }
+						: wf,
 				);
+
+				filteredWorkflows.value = filteredWorkflows.value.map((wf) =>
+					wf.id === marketplaceWorkflow.id
+						? { ...wf, downloads: marketplaceWorkflow.downloads }
+						: wf,
+				);
+
 				alert(`Workflow "${importedWf.name}" has been copied to your workflows.`);
-				selectedWorkflow.value = null;
+
+				// Don't close the modal so user can see updated download count
+				// selectedWorkflow.value = null;
 			} catch (err) {
 				console.error('Error importing workflow:', err);
 
