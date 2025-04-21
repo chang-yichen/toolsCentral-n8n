@@ -40,21 +40,6 @@ export class LlmDescriptionService {
 				return;
 			}
 
-			// Check if AWS credentials are provided
-			if (!ANTHROPIC_CONFIG.awsAccessKeyId) {
-				this.logger.error(
-					'AWS access key is missing. Please set ANTHROPIC_AWS_ACCESS_KEY_ID in your .env file.',
-				);
-				return;
-			}
-
-			if (!ANTHROPIC_CONFIG.awsSecretAccessKey) {
-				this.logger.error(
-					'AWS secret key is missing. Please set ANTHROPIC_AWS_SECRET_ACCESS_KEY in your .env file.',
-				);
-				return;
-			}
-
 			if (!ANTHROPIC_CONFIG.awsRegion) {
 				this.logger.error(
 					'AWS region is not specified. Please set ANTHROPIC_AWS_REGION in your .env file.',
@@ -80,13 +65,19 @@ export class LlmDescriptionService {
 			});
 
 			// Initialize the AWS Bedrock client
-			this.bedrockClient = new BedrockRuntimeClient({
+			const clientConfig: any = {
 				region: ANTHROPIC_CONFIG.awsRegion,
-				credentials: {
+			};
+
+			// Only add credentials if they are provided
+			if (ANTHROPIC_CONFIG.awsAccessKeyId && ANTHROPIC_CONFIG.awsSecretAccessKey) {
+				clientConfig.credentials = {
 					accessKeyId: ANTHROPIC_CONFIG.awsAccessKeyId,
 					secretAccessKey: ANTHROPIC_CONFIG.awsSecretAccessKey,
-				},
-			});
+				};
+			}
+
+			this.bedrockClient = new BedrockRuntimeClient(clientConfig);
 
 			this.initialized = true;
 			this.logger.info('AWS Bedrock client initialized successfully');
@@ -191,7 +182,7 @@ Focus on the main purpose and outcome, not technical details.
 
 Workflow: ${JSON.stringify(workflowInfo, null, 2)}
 
-Description: 
+Description:
 `;
 
 			// Format the request as required by Claude on AWS Bedrock
