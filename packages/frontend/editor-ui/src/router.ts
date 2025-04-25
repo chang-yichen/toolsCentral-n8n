@@ -19,6 +19,7 @@ import type { RouterMiddleware } from '@/types/router';
 import { initializeAuthenticatedFeatures, initializeCore } from '@/init';
 import { tryToParseNumber } from '@/utils/typesUtils';
 import { projectsRoutes } from '@/routes/projects.routes';
+import { insightsRoutes } from '@/features/insights/insights.router';
 import TestDefinitionRunDetailView from './views/TestDefinition/TestDefinitionRunDetailView.vue';
 import MarketplacePage from './components/MarketplacePage.vue';
 
@@ -28,6 +29,8 @@ const ForgotMyPasswordView = async () => await import('./views/ForgotMyPasswordV
 const MainHeader = async () => await import('@/components/MainHeader/MainHeader.vue');
 const MainSidebar = async () => await import('@/components/MainSidebar.vue');
 const CanvasChatSwitch = async () => await import('@/components/CanvasChat/CanvasChatSwitch.vue');
+const DemoFooter = async () =>
+	await import('@/components/CanvasChat/future/components/DemoFooter.vue');
 const NodeView = async () => await import('@/views/NodeView.vue');
 const WorkflowExecutionsView = async () => await import('@/views/WorkflowExecutionsView.vue');
 const WorkflowExecutionsLandingPage = async () =>
@@ -383,6 +386,7 @@ export const routes: RouteRecordRaw[] = [
 		name: VIEWS.DEMO,
 		components: {
 			default: NodeView,
+			footer: DemoFooter,
 		},
 		meta: {
 			middleware: ['authenticated'],
@@ -746,6 +750,7 @@ export const routes: RouteRecordRaw[] = [
 		},
 	},
 	...projectsRoutes,
+	...insightsRoutes,
 	{
 		path: '/:pathMatch(.*)*',
 		name: VIEWS.NOT_FOUND,
