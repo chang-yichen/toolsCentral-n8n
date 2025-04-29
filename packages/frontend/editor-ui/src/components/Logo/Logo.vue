@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import type { FrontendSettings } from '@n8n/api-types';
-import { computed, useCssModule } from 'vue';
+import { computed, useCssModule, onMounted } from 'vue';
 import { useUIStore } from '@/stores/ui.store';
 
-// Import both logo versions with the correct filenames
-import ToolsCentralLogoLight from '@/assets/images/tools-central-logo-light.png';
-import ToolsCentralLogoDark from '@/assets/images/tools-central-logo-dark.png';
+// Import both logo versions with the correct filenames - using require for direct URL
+// Use direct asset imports instead of module imports for SVGs
+const ToolsCentralLogoLight = new URL(
+	'@/assets/images/tools-central-logo-light.svg',
+	import.meta.url,
+).href;
+const ToolsCentralLogoDark = new URL('@/assets/images/tools-central-logo-dark.svg', import.meta.url)
+	.href;
 
 const props = defineProps<
 	(
@@ -27,6 +32,13 @@ const uiStore = useUIStore();
 // Determine which logo to use based on current theme
 const logoSrc = computed(() => {
 	return uiStore.appliedTheme === 'dark' ? ToolsCentralLogoDark : ToolsCentralLogoLight;
+});
+
+// Add console log to debug the logo source
+onMounted(() => {
+	console.log('Logo source:', logoSrc.value);
+	console.log('Dark logo URL:', ToolsCentralLogoDark);
+	console.log('Light logo URL:', ToolsCentralLogoLight);
 });
 
 const $style = useCssModule();
