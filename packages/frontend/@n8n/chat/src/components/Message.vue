@@ -1,5 +1,7 @@
 <script lang="ts" setup>
 /* eslint-disable @typescript-eslint/naming-convention */
+import { useOptions } from '@n8n/chat/composables';
+import type { ChatMessage, ChatMessageText } from '@n8n/chat/types';
 import hljs from 'highlight.js/lib/core';
 import bash from 'highlight.js/lib/languages/bash';
 import javascript from 'highlight.js/lib/languages/javascript';
@@ -10,9 +12,6 @@ import type MarkdownIt from 'markdown-it';
 import markdownLink from 'markdown-it-link-attributes';
 import { computed, ref, toRefs, onMounted } from 'vue';
 import VueMarkdown from 'vue-markdown-render';
-
-import { useOptions } from '@n8n/chat/composables';
-import type { ChatMessage, ChatMessageText } from '@n8n/chat/types';
 
 import ChatFile from './ChatFile.vue';
 
@@ -105,7 +104,7 @@ onMounted(async () => {
 
 <template>
 	<div ref="messageContainer" class="chat-message" :class="classes">
-		<div v-if="$slots.beforeMessage" class="chat-message-actions">
+		<div v-if="$slots['beforeMessage']?.()" class="chat-message-actions">
 			<slot name="beforeMessage" v-bind="{ message }" />
 		</div>
 		<slot>

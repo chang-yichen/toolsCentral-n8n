@@ -3,6 +3,9 @@ ARG NODE_VERSION=20
 # 1. Create an image to build n8n
 FROM --platform=linux/amd64 n8nio/base:${NODE_VERSION} AS builder
 
+# Set Node.js memory limit
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+
 # Build the application from source
 WORKDIR /src
 COPY . /src
@@ -23,6 +26,7 @@ RUN NODE_ENV=production DOCKER_BUILD=true pnpm --filter=n8n --prod --no-optional
 # 2. Start with a new clean image with just the code that is needed to run n8n
 FROM n8nio/base:${NODE_VERSION}
 ENV NODE_ENV=production
+ENV NODE_EXTRA_CA_CERTS=/cert/ca.cer
 
 ARG N8N_RELEASE_TYPE=dev
 ENV N8N_RELEASE_TYPE=${N8N_RELEASE_TYPE}
@@ -30,6 +34,7 @@ ENV N8N_RELEASE_TYPE=${N8N_RELEASE_TYPE}
 WORKDIR /home/node
 COPY --from=builder /compiled /usr/local/lib/node_modules/n8n
 COPY docker/images/n8n/docker-entrypoint.sh /
+COPY cert/ca.cer /cert/ca.cer
 
 # Setup the Task Runner Launcher
 ARG TARGETPLATFORM
