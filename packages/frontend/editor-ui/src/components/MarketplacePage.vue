@@ -5,7 +5,7 @@
 			<div class="publish-banner-content">
 				<div class="banner-text">
 					<h2>Publish Your Workflow</h2>
-					<p>Share your automation workflows with the n8n community</p>
+					<p>Share your automation workflows within CPFB</p>
 				</div>
 				<n8n-button label="Publish Workflow" type="primary" size="large" @click="openPublishForm" />
 			</div>
@@ -13,7 +13,7 @@
 
 		<h1>Workflow Marketplace</h1>
 		<p class="marketplace-description">
-			Discover and share workflows with the community. Browse the available workflows below.
+			Discover and share workflows within CPFB. Browse the available workflows below.
 		</p>
 
 		<!-- Filter options -->
