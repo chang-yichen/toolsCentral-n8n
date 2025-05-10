@@ -11,6 +11,8 @@ import type {
 } from 'n8n-workflow';
 import { NodeApiError } from 'n8n-workflow';
 
+import type { JiraServerInfo, JiraWebhook } from './types';
+
 export async function jiraSoftwareCloudApiRequest(
 	this: IHookFunctions | IExecuteFunctions | ILoadOptionsFunctions,
 	endpoint: string,
@@ -86,15 +88,19 @@ export async function jiraSoftwareCloudApiRequestAllItems(
 	let responseData;
 
 	query.startAt = 0;
-	body.startAt = 0;
 	query.maxResults = 100;
-	body.maxResults = 100;
+	if (method !== 'GET') {
+		body.startAt = 0;
+		body.maxResults = 100;
+	}
 
 	do {
 		responseData = await jiraSoftwareCloudApiRequest.call(this, endpoint, method, body, query);
 		returnData.push.apply(returnData, responseData[propertyName] as IDataObject[]);
 		query.startAt = (responseData.startAt as number) + (responseData.maxResults as number);
-		body.startAt = (responseData.startAt as number) + (responseData.maxResults as number);
+		if (method !== 'GET') {
+			body.startAt = (responseData.startAt as number) + (responseData.maxResults as number);
+		}
 	} while (
 		(responseData.startAt as number) + (responseData.maxResults as number) <
 		responseData.total
@@ -122,8 +128,9 @@ export function eventExists(currentEvents: string[], webhookEvents: string[]) {
 	return true;
 }
 
-export function getId(url: string) {
-	return url.split('/').pop();
+export function getWebhookId(webhook: JiraWebhook) {
+	if (webhook.id) return webhook.id.toString();
+	return webhook.self?.split('/').pop();
 }
 
 export function simplifyIssueOutput(responseData: {
@@ -265,4 +272,23 @@ export async function getUsers(this: ILoadOptionsFunctions): Promise<INodeProper
 		.sort((a: INodePropertyOptions, b: INodePropertyOptions) => {
 			return a.name.toLowerCase() > b.name.toLowerCase() ? 1 : -1;
 		});
+}
+
+export async function getServerInfo(this: IHookFunctions) {
+	return await (jiraSoftwareCloudApiRequest.call(
+		this,
+		'/api/2/serverInfo',
+		'GET',
+	) as Promise<JiraServerInfo>);
+}
+
+export async function getWebhookEndpoint(this: IHookFunctions) {
+	const serverInfo = await getServerInfo.call(this).catch(() => null);
+
+	if (!serverInfo || serverInfo.deploymentType === 'Cloud') return '/webhooks/1.0/webhook';
+
+	// Assume old version when versionNumbers is not set
+	const majorVersion = serverInfo.versionNumbers?.[0] ?? 1;
+
+	return majorVersion >= 10 ? '/jira-webhook/1.0/webhooks' : '/webhooks/1.0/webhook';
 }

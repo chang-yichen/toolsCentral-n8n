@@ -1,4 +1,4 @@
-import { successToast } from '../pages/notifications';
+import { errorToast, successToast } from '../pages/notifications';
 
 /**
  * Getters
@@ -45,6 +45,14 @@ export function getWorkflowCardActionItem(workflowName: string, actionName: stri
 		.then((popperId) => {
 			return cy.get(`#${popperId}`).find(`[data-test-id="action-${actionName}"]`);
 		});
+}
+
+export function getDuplicateWorkflowModal() {
+	return cy.getByTestId('duplicate-modal');
+}
+
+export function getWorkflowMenu() {
+	return cy.getByTestId('workflow-menu');
 }
 
 export function getAddFolderButton() {
@@ -212,6 +220,11 @@ export function getNewFolderNameInput() {
 export function getNewFolderModalErrorMessage() {
 	return cy.get('.el-message-box__errormsg').filter(':visible');
 }
+
+export function getProjectTab(tabId: string) {
+	return cy.getByTestId('project-tabs').find(`#${tabId}`);
+}
+
 /**
  * Actions
  */
@@ -299,6 +312,24 @@ export function renameFolderFromCardActions(folderName: string, newName: string)
 	renameFolder(newName);
 }
 
+export function duplicateWorkflowFromCardActions(workflowName: string, duplicateName: string) {
+	getWorkflowCardActions(workflowName).click();
+	getWorkflowCardActionItem(workflowName, 'duplicate').click();
+	getDuplicateWorkflowModal().find('input').first().type('{selectall}');
+	getDuplicateWorkflowModal().find('input').first().type(duplicateName);
+	getDuplicateWorkflowModal().find('button').contains('Duplicate').click();
+	errorToast().should('not.exist');
+}
+
+export function duplicateWorkflowFromWorkflowPage(duplicateName: string) {
+	getWorkflowMenu().click();
+	cy.getByTestId('workflow-menu-item-duplicate').click();
+	getDuplicateWorkflowModal().find('input').first().type('{selectall}');
+	getDuplicateWorkflowModal().find('input').first().type(duplicateName);
+	getDuplicateWorkflowModal().find('button').contains('Duplicate').click();
+	errorToast().should('not.exist');
+}
+
 export function deleteEmptyFolderFromCardDropdown(folderName: string) {
 	cy.intercept('DELETE', '/rest/projects/**').as('deleteFolder');
 	getFolderCard(folderName).click();
@@ -382,6 +413,21 @@ export function moveWorkflowToFolder(workflowName: string, folderName: string) {
 	getMoveToFolderOption(folderName).should('be.visible').click();
 	getMoveFolderConfirmButton().should('be.enabled').click();
 }
+
+export function dragAndDropToFolder(sourceName: string, destinationName: string) {
+	const draggable = `[data-test-id=draggable]:has([data-resourcename="${sourceName}"])`;
+	const droppable = `[data-test-id=draggable]:has([data-resourcename="${destinationName}"])`;
+	cy.get(draggable).trigger('mousedown');
+	cy.draganddrop(draggable, droppable, { position: 'center' });
+}
+
+export function dragAndDropToProjectRoot(sourceName: string) {
+	const draggable = `[data-test-id=draggable]:has([data-resourcename="${sourceName}"])`;
+	const droppable = '[data-test-id="home-project"]';
+	cy.get(draggable).trigger('mousedown');
+	cy.draganddrop(draggable, droppable, { position: 'center' });
+}
+
 /**
  * Utils
  */
@@ -443,9 +489,9 @@ function moveFolder(folderName: string, destinationName: string) {
 	cy.intercept('PATCH', '/rest/projects/**').as('moveFolder');
 	getMoveFolderModal().should('be.visible');
 	getMoveFolderModal().find('h1').first().contains(`Move "${folderName}" to another folder`);
-	getMoveToFolderDropdown().click();
 	// Try to find current folder in the dropdown
-	getMoveToFolderInput().type(folderName, { delay: 50 });
+	// This tests that auto-focus worked as expected
+	cy.focused().type(folderName, { delay: 50 });
 	// Should not be available
 	getEmptyFolderDropdownMessage('No folders found').should('exist');
 	// Select destination folder
