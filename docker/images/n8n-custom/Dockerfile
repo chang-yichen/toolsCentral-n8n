@@ -9,7 +9,11 @@ ENV NODE_OPTIONS="--max-old-space-size=4096"
 # Build the application from source
 WORKDIR /src
 COPY . /src
-RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store --mount=type=cache,id=pnpm-metadata,target=/root/.cache/pnpm/metadata DOCKER_BUILD=true pnpm install --frozen-lockfile
+# Add packages to package.json dependencies for use in n8n code node before install
+RUN jq '.dependencies["httpntlm"] = "^1.8.13" | .dependencies["playwright-core"] = "1.52.0" | .dependencies["puppeteer-core"] = "24.8.2"' package.json > package.json.tmp && mv package.json.tmp package.json
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store --mount=type=cache,id=pnpm-metadata,target=/root/.cache/pnpm/metadata DOCKER_BUILD=true pnpm install --no-frozen-lockfile
+
+# ------------------------------------------------------------
 RUN pnpm build
 
 # Delete all dev dependencies
