@@ -34,9 +34,9 @@ import { WorkflowHistory } from './workflow-history';
 import { WorkflowStatistics } from './workflow-statistics';
 import { WorkflowTagMapping } from './workflow-tag-mapping';
 import { MarketplaceWorkflowEntity } from './marketplace-workflow-entity';
-import { InsightsByPeriod } from '../../modules/insights/entities/insights-by-period';
-import { InsightsMetadata } from '../../modules/insights/entities/insights-metadata';
-import { InsightsRaw } from '../../modules/insights/entities/insights-raw';
+import { InsightsByPeriod } from '../../modules/insights/database/entities/insights-by-period';
+import { InsightsMetadata } from '../../modules/insights/database/entities/insights-metadata';
+import { InsightsRaw } from '../../modules/insights/database/entities/insights-raw';
 
 export const entities = {
 	AnnotationTagEntity,

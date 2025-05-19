@@ -1,4 +1,4 @@
-import { Get, Post, RestController, Param, Delete } from '@/decorators';
+import { Get, Post, RestController, Param, Delete } from '@n8n/decorators';
 import { MarketplaceService } from '@/services/marketplace.service'; // Use alias path
 import type { Request as ExpressRequest } from 'express'; // Use Express types if applicable
 import type { User } from '../databases/entities/user'; // Assuming User entity path
