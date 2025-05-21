@@ -114,6 +114,9 @@ watch(defaultLocale, (newLocale) => {
 				<div v-if="hasContentFooter" :class="$style.contentFooter">
 					<RouterView name="footer" />
 				</div>
+				<div :class="$style.disclaimer">
+					Data classification allowed - Restricted, Sensitive-normal
+				</div>
 			</div>
 			<div :id="APP_MODALS_ELEMENT_ID" :class="$style.modals">
 				<Modals />
@@ -184,6 +187,16 @@ watch(defaultLocale, (newLocale) => {
 		width: 100%;
 		height: 100%;
 	}
+}
+
+.disclaimer {
+	width: 100%;
+	text-align: center;
+	padding: var(--spacing-xs);
+	color: var(--color-text-light);
+	font-size: var(--font-size-2xs);
+	background-color: var(--color-background-xlight);
+	border-top: 1px solid var(--color-foreground-base);
 }
 
 .header {
