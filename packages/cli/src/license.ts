@@ -218,10 +218,7 @@ export class License {
 		this.logger.debug('License shut down');
 	}
 
-	isFeatureEnabled(feature: BooleanLicenseFeature): boolean {
-		if (feature === LICENSE_FEATURES.ADVANCED_PERMISSIONS) {
-			return true;
-		}
+	isFeatureEnabled(feature: BooleanLicenseFeature) {
 		return this.manager?.hasFeatureEnabled(feature) ?? false;
 	}
 
@@ -262,7 +259,7 @@ export class License {
 	}
 
 	isAdvancedPermissionsLicensed() {
-		return true;
+		return this.isFeatureEnabled(LICENSE_FEATURES.ADVANCED_PERMISSIONS);
 	}
 
 	isDebugInEditorLicensed() {
