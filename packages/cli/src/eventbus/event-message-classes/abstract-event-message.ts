@@ -114,7 +114,7 @@ export abstract class AbstractEventMessage {
 		return {
 			__type: this.__type,
 			id: this.id,
-			ts: this.ts.toISO(),
+			ts: this.ts.toISO() as string,
 			eventName: this.eventName,
 			message: this.message,
 			payload: this.payload,
@@ -125,8 +125,10 @@ export abstract class AbstractEventMessage {
 		this.id = options.id ?? uuid();
 		this.eventName = options.eventName;
 		this.message = options.message ?? options.eventName;
+
 		if (typeof options.ts === 'string') {
-			this.ts = DateTime.fromISO(options.ts) ?? DateTime.now();
+			const dt = DateTime.fromISO(options.ts);
+			this.ts = dt.isValid ? dt : DateTime.now();
 		} else {
 			this.ts = options.ts ?? DateTime.now();
 		}

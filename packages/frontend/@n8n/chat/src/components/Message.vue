@@ -104,7 +104,7 @@ onMounted(async () => {
 
 <template>
 	<div ref="messageContainer" class="chat-message" :class="classes">
-		<div v-if="$slots['beforeMessage']?.()" class="chat-message-actions">
+		<div v-if="$slots['beforeMessage']?.({ message })" class="chat-message-actions">
 			<slot name="beforeMessage" v-bind="{ message }" />
 		</div>
 		<slot>

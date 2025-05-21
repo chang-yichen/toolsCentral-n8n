@@ -168,7 +168,7 @@ export class InsightsService {
 		return rows.map((r) => {
 			const total = r.succeeded + r.failed;
 			return {
-				date: r.periodStart,
+				date: r.periodStart ? r.periodStart : new Date().toISOString(),
 				values: {
 					total,
 					succeeded: r.succeeded,
