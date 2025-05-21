@@ -157,21 +157,6 @@ const mainMenuItems = computed(() => [
 					target: '_blank',
 				},
 			},
-			{
-				id: 'report-bug',
-				icon: 'bug',
-				label: i18n.baseText('mainSidebar.helpMenuItems.reportBug'),
-				link: {
-					href: getReportingURL(),
-					target: '_blank',
-				},
-			},
-			{
-				id: 'about',
-				icon: 'info',
-				label: i18n.baseText('mainSidebar.aboutN8n'),
-				position: 'bottom',
-			},
 		],
 	},
 ]);
@@ -263,11 +248,6 @@ const handleSelect = (key: string) => {
 		case 'marketplace':
 			// Handle marketplace navigation if needed
 			break;
-		case 'about': {
-			trackHelpItemClick('about');
-			uiStore.openModal(ABOUT_MODAL_KEY);
-			break;
-		}
 		case 'cloud-admin': {
 			void pageRedirectionHelper.goToDashboard();
 			break;
