@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+// Set NODE_OPTIONS for increased memory limit
+process.env.NODE_OPTIONS = process.env.NODE_OPTIONS || '--max-old-space-size=8192';
+
 const path = require('path');
 
 // Make sure that it also find the config folder when it

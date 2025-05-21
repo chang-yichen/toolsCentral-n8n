@@ -286,49 +286,133 @@ export class MarketplaceService {
 		if (!obj) return obj;
 
 		try {
-			const replacer = (key: string, value: any) => {
-				// Handle special case for functions that could appear in node parameters
-				if (typeof value === 'function') {
-					return `[Function: ${value.name || 'anonymous'}]`;
-				}
+			// Use a more memory-efficient approach for large objects
+			// Instead of using JSON.stringify/parse for the entire object at once
+			// Process the object in a more controlled way
 
-				// Special case for handling INodeParameters fields with circular references
-				if (key === 'parameters' && typeof value === 'object' && value !== null) {
-					// Clone parameters but sanitize any potentially circular values
-					const cleanedParams: any = {};
+			// For arrays, process each item individually
+			if (Array.isArray(obj)) {
+				return obj.map((item) => this.cloneItem(item)) as unknown as T;
+			}
 
-					for (const paramKey in value) {
-						let paramValue = value[paramKey];
-
-						// Simplify complex objects that might cause circular refs
-						if (paramValue && typeof paramValue === 'object') {
-							// Convert complex objects to a simpler format
-							if (Array.isArray(paramValue)) {
-								// For arrays, make a shallow copy
-								cleanedParams[paramKey] = [...paramValue];
-							} else {
-								// For objects, convert to a basic representation
-								cleanedParams[paramKey] = { ...paramValue };
-							}
-						} else {
-							// Simple values can be copied directly
-							cleanedParams[paramKey] = paramValue;
-						}
+			// For objects, create a new object and copy properties
+			if (typeof obj === 'object') {
+				const result: Record<string, any> = {};
+				for (const key in obj) {
+					if (Object.prototype.hasOwnProperty.call(obj, key)) {
+						result[key] = this.cloneItem((obj as Record<string, any>)[key]);
 					}
-
-					return cleanedParams;
 				}
+				return result as T;
+			}
 
-				return value;
-			};
-
-			// Clone using JSON with a custom replacer to handle circular references
-			return JSON.parse(JSON.stringify(obj, replacer));
+			// For primitive values, return as is
+			return obj;
 		} catch (error) {
 			console.error('Error in safeClone:', error);
 			// If deep clone fails, create a shallow copy
 			return this.createMinimalCopy(obj);
 		}
+	}
+
+	/**
+	 * Helper method to clone individual items within an object
+	 */
+	private cloneItem(value: any): any {
+		// Handle null values
+		if (value === null) return null;
+
+		// Handle primitive values
+		if (typeof value !== 'object' && typeof value !== 'function') {
+			return value;
+		}
+
+		// Handle functions
+		if (typeof value === 'function') {
+			return `[Function: ${value.name || 'anonymous'}]`;
+		}
+
+		// Handle dates
+		if (value instanceof Date) {
+			return new Date(value.getTime());
+		}
+
+		// Handle arrays
+		if (Array.isArray(value)) {
+			// For large arrays, consider slicing if needed
+			if (value.length > 10000) {
+				this.logger.warn(
+					'Large array detected in workflow clone operation, performance may be affected',
+				);
+			}
+			return value.map((item) => this.cloneItem(item));
+		}
+
+		// Handle special case for parameters that might cause circular references
+		if (value && typeof value === 'object') {
+			// Check if this is a parameters object which needs special handling
+			if ('parameters' in value && typeof value.parameters === 'object') {
+				const result: Record<string, any> = {};
+
+				for (const key in value) {
+					if (key === 'parameters') {
+						// Special handling for parameters
+						result[key] = this.handleParameters(value[key]);
+					} else {
+						// Normal cloning for other properties
+						result[key] = this.cloneItem(value[key]);
+					}
+				}
+
+				return result;
+			}
+
+			// Regular object cloning
+			const result: Record<string, any> = {};
+			for (const key in value) {
+				if (Object.prototype.hasOwnProperty.call(value, key)) {
+					result[key] = this.cloneItem(value[key]);
+				}
+			}
+			return result;
+		}
+
+		// Fallback - return empty object
+		return {};
+	}
+
+	/**
+	 * Special handler for parameters to avoid circular references
+	 */
+	private handleParameters(parameters: any): any {
+		if (!parameters || typeof parameters !== 'object') {
+			return parameters;
+		}
+
+		const cleanedParams: Record<string, any> = {};
+
+		for (const key in parameters) {
+			if (Object.prototype.hasOwnProperty.call(parameters, key)) {
+				const value = parameters[key];
+
+				// Keep primitive values as is
+				if (value === null || typeof value !== 'object') {
+					cleanedParams[key] = value;
+					continue;
+				}
+
+				// For arrays, make a shallow copy
+				if (Array.isArray(value)) {
+					cleanedParams[key] = [...value];
+					continue;
+				}
+
+				// For objects, make a shallow copy
+				cleanedParams[key] = { ...value };
+			}
+		}
+
+		return cleanedParams;
 	}
 
 	/**
