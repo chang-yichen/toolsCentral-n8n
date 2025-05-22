@@ -27,14 +27,6 @@ const uiStore = useUIStore();
 const sidebarMenuItems = computed<IMenuItem[]>(() => {
 	const menuItems: IMenuItem[] = [
 		{
-			id: 'settings-usage-and-plan',
-			icon: 'chart-bar',
-			label: i18n.baseText('settings.usageAndPlan.title'),
-			position: 'top',
-			available: canUserAccessRouteByName(VIEWS.USAGE),
-			route: { to: { name: VIEWS.USAGE } },
-		},
-		{
 			id: 'settings-personal',
 			icon: 'user-circle',
 			label: i18n.baseText('settings.personal'),
